@@ -16,17 +16,17 @@ extract-method-names() {
 
     # Validate input
     [[ -z "$file_path" ]] && {
-        _elog "ERROR: No file path provided to extract-method-names"
+        log.error "ERROR: No file path provided to extract-method-names"
         return 1
     }
 
     [[ ! -f "$file_path" ]] && {
-        _elog "ERROR: File not found: $file_path"
+        log.error "ERROR: File not found: $file_path"
         return 1
     }
 
     [[ ! -f "$awk_script" ]] && {
-        _elog "ERROR: AWK script not found: $awk_script"
+        log.error "ERROR: AWK script not found: $awk_script"
         return 1
     }
 
@@ -47,8 +47,9 @@ export-lib-methods() {
 
 #=================== Load Components ====================
 
+
 [[ -z "$LIB_DIR" ]] && {
-    _elog "ERROR: LIB_DIR is not set"
+    log.error "ERROR: LIB_DIR is not set"
     exit 1
 }
 
@@ -57,15 +58,16 @@ for lib_name in colors logger import-lib; do
     _lib_path="${LIB_DIR}/${lib_name}.sh"
 
     if [[ -f "$_lib_path" ]]; then
+        # shellcheck source=/dev/null
         if source "$_lib_path"; then
             export-lib-methods "$_lib_path"
             IMPORTED_LIBS["$(realpath "$_lib_path")"]=1
         else
-            _elog "FATAL: Failed to source ${lib_name} from '$_lib_path'"
+            log.error "FATAL: Failed to source ${lib_name} from '$_lib_path'"
             exit 1
         fi
     else
-        _elog "FATAL: Cannot load ${lib_name} from '$_lib_path'"
+        log.error "FATAL: Cannot load ${lib_name} from '$_lib_path'"
         exit 1
     fi
 done

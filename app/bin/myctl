@@ -41,10 +41,14 @@ MAX_MIC=$MAX_VOLUME
 shopt -s expand_aliases
 
 
-#-------- Error logger ----------
-_elog() {
-    echo -e "\033[0;31m✗ $1\033[0m" >&2
-}
+#-------- Fallback logger ----------
+
+log.debug()   { echo -e "\033[0;30m# $1\033[0m" >&2;  }
+log.info()    { echo -e "i $1" >&2;                   }
+log.success() { echo -e "\033[0;32m✓ $1\033[0m" >&2;  }
+log.warning() { echo -e "\033[0;33m! $1\033[0m" >&2;  }
+log.error()   { echo -e "\033[0;31m✗ $1\033[0m" >&2;  }
+log.fatal()   { log.error "$@" && exit 1; }
 
 #----------- This binary's path -------------
 
@@ -75,7 +79,7 @@ for base in "${INSTALL_DIRS[@]}"; do
 done
 
 if [[ -z "$LIB_DIR" || -z "$SRC_DIR" ]]; then
-    echo "FATAL: Couldn't find a valid myctl installation." >&2
+    log.error "FATAL: Couldn't find a valid myctl installation."
     exit 1
 fi
 
@@ -94,7 +98,7 @@ declare -A cmd_map IMPORTED_LIBS
 #------------ Source Components ----------
 # shellcheck source=/dev/null
 source "$LIB_DIR"/_loader.sh || {
-    _elog "FATAL: Failed to source Components"
+    log.error "FATAL: Failed to source Components"
     exit 1
 }
 
