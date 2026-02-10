@@ -141,3 +141,11 @@ jobs:
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: "Update to ${{ env.VERSION }}-${{ env.PKGREL }}"
           ssh_keyscan_types: rsa,ecdsa,ed25519
+
+      - name: Trigger MyRepo Build
+        if: success()
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          repository: mydehq/my-repo
+          event-type: trigger-build
