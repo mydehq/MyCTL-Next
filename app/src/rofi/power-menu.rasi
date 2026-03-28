@@ -11,7 +11,7 @@ configuration {
 
 
 /*****----- Global Properties -----*****/
-@import                          "~/.config/rofi/config.rasi"
+@import   "~/.config/rofi/config.rasi"
 
 
 /*****----- Main Window -----*****/

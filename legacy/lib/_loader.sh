@@ -53,7 +53,7 @@ export-lib-methods() {
     exit 1
 }
 
-for lib_name in colors logger import-lib; do
+for lib_name in colors logger import-lib utils; do
 
     _lib_path="${LIB_DIR}/${lib_name}.sh"
 

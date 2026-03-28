@@ -11,7 +11,7 @@
 
 # ==================== Configuration ====================
 
-# Default log level (debug, normal, info, success, warn, error, fatal)
+# Default log level (trace, debug, normal, info, success, warn, error, fatal)
 LOG_MIN_LEVEL="${LOG_MIN_LEVEL:-info}"
 
 # Enable/Disable colored output (true/false)
@@ -23,14 +23,10 @@ LOG_FILE="${LOG_FILE:-}"
 # Notification settings
 LOG_NOTIFY="${LOG_NOTIFY:-false}"
 
-# Show caller method in debug mode
-LOG_SHOW_CALLER="${LOG_SHOW_CALLER:-false}"
-
-
 # ================= Pre Processing ====================
 
 readonly LOG_FILE
-export LOG_MIN_LEVEL LOG_TAB LOG_COLOR LOG_TIMESTAMP LOG_SHOW_CALLER
+export LOG_MIN_LEVEL LOG_TAB LOG_COLOR LOG_TIMESTAMP
 
 #================ Detect Context ==================
 
@@ -172,6 +168,7 @@ _log() {
             info)             echo 20  ;;
             normal|"")        echo 15  ;;
             debug)            echo 10  ;;
+            trace)            echo 5   ;;
             *)
                 _elog "Error: Invalid level name '$1'. Defaulting to normal."
                 echo 15
@@ -306,14 +303,12 @@ _log() {
 
     #------------ Find Caller ----------
 
-    # Show caller if explicitly enabled OR if we are in debug (min_level <= 10) mode
-    if [[ "$min_level_num" -le 10 ]] || $LOG_SHOW_CALLER; then
-        if [[ -z "$caller_func" ]]; then
-             caller_func=" [$(_log_caller)]" || {
-                _elog "Failed to get caller function"
-                return 1
-            }
-        fi
+    # Fetch caller log level is trace & not Explicitly passed
+    if [[ "$min_level_num" -le 5 ]] && [[ -z "$caller_func" ]]; then
+        caller_func=" [$(_log_caller)]" || {
+            _elog "Failed to get caller function"
+            return 1
+        }
     fi
 
     #---------- Print Message -----------
