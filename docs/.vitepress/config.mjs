@@ -10,8 +10,8 @@ export default defineConfig({
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/architecture' },
-      { text: 'SDK', link: '/plugin-sdk' }
+      { text: 'Architecture', link: '/architecture' },
+      { text: 'Plugin SDK', link: '/plugin-sdk' }
     ],
 
     sidebar: [
@@ -29,18 +29,16 @@ export default defineConfig({
           { text: 'Command Discovery', link: '/discovery' },
           { text: 'Plugin SDK Guide', link: '/plugin-sdk' }
         ]
-      },
-      {
-        text: 'Examples',
-        items: [
-          { text: 'Markdown Examples', link: '/markdown-examples' },
-          { text: 'Runtime API Examples', link: '/api-examples' }
-        ]
       }
     ],
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/mydehq/MyCTL' }
-    ]
+    ],
+
+    footer: {
+      message: 'Released under the MIT License.',
+      copyright: 'Copyright © 2026-present MydeHQ'
+    }
   }
 })
