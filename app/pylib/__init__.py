@@ -1,1 +1,0 @@
-# MyCTL Python library
