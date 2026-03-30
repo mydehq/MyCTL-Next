@@ -54,5 +54,5 @@ myctl daemon start --foreground
 ## What's Next?
 
 - **[Command Reference](/guide/command-reference)**: Explore the full list of available CLI commands.
-- **[Plugin SDK](/plugins/plugin-sdk)**: Learn how to build your own system integrations using Python.
+- **[Plugin SDK](/dev/plugin-sdk)**: Learn how to build your own system integrations using Python.
 - **[System Architecture](/technical/architecture)**: Understand the "Lean Go / Fat Python" design.
