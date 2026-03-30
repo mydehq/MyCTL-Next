@@ -1,0 +1,27 @@
+[tools]
+go = "1.26"
+uv = "latest"
+bun = "latest"
+
+[env]
+_.path = ["./bin"]
+
+[tasks."build:client"]
+description = "Compile the Go client"
+run = "go build -o ../bin/myctl ."
+dir = "cmd"
+
+[tasks."sync:daemon"]
+description = "Ensure daemon dependencies are synced"
+run = "uv sync"
+dir = "daemon"
+
+[tasks.build]
+description = "Build all components"
+depends = ["build:client", "sync:daemon"]
+
+[tasks.start]
+description = "Start the development daemon"
+run = "uv run myctld"
+dir = "daemon"
+env = { PYTHONPATH = "." }

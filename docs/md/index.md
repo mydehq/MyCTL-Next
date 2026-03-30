@@ -1,18 +1,19 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
 hero:
-  name: "MyCTL"
-  text: "The Unified Linux Desktop Controller."
-  tagline: "A Lean Go Proxy meets an Intelligent Python Daemon. Sub-millisecond speeds, infinite N-level nesting, and pro-grade SDKs."
+  image:
+    src: /icon.svg
+    alt: MyCTL Logo
+
   actions:
     - theme: brand
-      text: "Read the Architecture"
-      link: /architecture
+      text: "Get Started"
+      link: /guide/getting-started
+
     - theme: alt
-      text: "View Plugin SDK"
-      link: /plugin-sdk
+      text: "Architecture"
+      link: /technical/architecture
 
 features:
   - title: "⚡️ Sub-ms Proxy"

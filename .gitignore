@@ -11,6 +11,7 @@ bin/
 # --- UV / pip / node / bun ---
 # uv.lock
 node_modules/
+cache/
 
 # --- Environment ---
 .env

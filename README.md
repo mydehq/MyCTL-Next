@@ -1,70 +1,79 @@
 <div align="center">
-  <img src="./app/icons/icon.png" height="75" alt="MyCTL Logo">
-  <h1>MyCTL</h1>
-  <p><b>A powerful CLI to control your Linux Desktop</b></p>
-
-MyCTL is a cli tool that provides a unified way to control common Linux desktop operations.   
-While it integrates with the MyDE desktop environment, MyCTL works independently on any Linux system.
-
+  <img src="./docs/public/icon.png" height="75" alt="MyCTL Logo">
+  <h1>MyCTL Next</h1>
+  <p><b>Architectural overhaul of MyCTL — A high-performance Linux desktop controller</b></p>
 </div>
 
----
+MyCTL is a CLI tool built on a **Lean Client / Fat Server** architecture. A tiny Go binary proxies all commands to a persistent Python daemon, enabling zero-latency CLI response times, deep system integration, and a self-bootstrapping plugin ecosystem.
+
+## Architecture
+
+```
+myctl <command>  →  client Proxy  →  Unix Socket (IPC)  →  Python Daemon
+                     (thin)                              (smart server)
+```
+
+- **Go Client** (`cmd/`): Fetches the command schema from the daemon at runtime and builds a Cobra CLI tree dynamically.
+- **Python Daemon** (`daemon/`): Handles N-level command routing, plugin discovery, and native system integrations (PulseAudio, DBus).
+- **Plugins** (`plugins/`, `~/.local/share/myctl/plugins/`): Self-contained Python packages declared via `pyproject.toml`.
 
 ## Installation
 
-### Arch Linux
-
-The package is available on the AUR as `myctl`:
-
-#### 1. Using AUR helper
-
-```bash
-# Using an AUR helper (e.g., yay, paru)
-yay -S myctl
-# or
-paru -S myctl
-```
-
-#### 2. Manually
-
-```bash
-# Clone repo & cd into it
-git clone https://aur.archlinux.org/myctl && cd myctl
-
-# Build package
-makepkg
-
-# Install the package
-sudo pacman -U myctl-*.pkg.tar.zst
-```
-
 ### From Source
 
-Install Required dependencies:
-
-- `bash` - Shell interpreter
-- `gawk` - Text processing
-- `sed` - Stream editor
-- `grep` - Pattern matching
-- `rofi` - Application launcher and menu system
-- `wob` - Wayland overlay bar for visual feedback
-- `wireplumber` - For volume control
+**Prerequisites**: `mise`, `go`, `python 3.13+`, `uv`
 
 ```bash
 git clone https://github.com/mydehq/myctl && cd myctl
 
-bash app/bin/myctl
+# Install toolchain
+mise install
+
+# Build & install
+mise run build
 ```
+
+The compiled binary is placed at `bin/myctl`. Add it to your `$PATH`.
 
 ## Usage
 
-For Usage & Configuration, visit [Documentation](https://mydehq.github.io/mywiki/docs/user-guide/myctl)
+```bash
+# Start the daemon (auto-started on first command)
+myctl daemon start
 
-## Related Resources
+# Run any command
+myctl <plugin> <command> [args]
 
-- **Main Repository**: [mydehq/MyDE](https://github.com/mydehq/myde)
-- **Wiki Repository**: [mydehq/MyWiki](https://github.com/mydehq/mydehq.github.io)
-- **Dependency Library**: [soymadip/KireiSakura Kit](https://soymadip.github.io/KireiSakura-Kit)
+# Get help
+myctl --help
+myctl <plugin> --help
+```
+
+## Plugin Development
+
+Plugins are self-contained Python packages. Drop a folder into `~/.local/share/myctl/plugins/`:
+
+```
+myplugin/
+├── pyproject.toml   # manifest ([project] + [tool.myctl])
+└── main.py          # commands via @registry.add_cmd
+```
+
+See the [Plugin SDK Guide](docs/md/dev/plugin-sdk.md) for the full reference.
+
+## Developer Documentation
+
+The full technical documentation is available at the [MyCTL Developer Portal](https://mydehq.github.io/myctl):
+
+- [Architecture Overview](docs/md/technical/architecture.md)
+- [IPC Protocol Specification](docs/md/technical/ipc-protocol.md)
+- [Plugin Discovery Engine](docs/md/technical/plugin-discovery.md)
+- [Plugin SDK Guide](docs/md/dev/plugin-sdk.md)
+- [Server API Reference](docs/md/dev/server-api.md)
+
+## Related
+
+- **MyDE**: [mydehq/MyDE](https://github.com/mydehq/myde)
 
 ---
 

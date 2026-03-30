@@ -1,44 +1,65 @@
-import { defineConfig } from 'vitepress'
+import { withMermaid } from "vitepress-plugin-mermaid";
+import { metadata } from "../vars.js";
 
-// https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withMermaid({
   srcDir: "md",
-  
-  title: "MyCTL",
-  description: "The Unified Linux Desktop CLI",
+  cleanUrls: true,
+  vite: {
+    publicDir: "../public",
+  },
+
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/icon.svg" }]],
+
+  title: metadata.title,
+  description: metadata.description,
+
+  transformPageData(pageData) {
+    if (pageData.relativePath === "index.md") {
+      pageData.frontmatter.hero.name = metadata.title;
+      pageData.frontmatter.hero.text = metadata.description;
+      pageData.frontmatter.hero.tagline = metadata.tagline;
+    }
+  },
+
   themeConfig: {
-    // https://vitepress.dev/reference/default-theme-config
+    logo: "/icon.svg",
+
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Architecture', link: '/architecture' },
-      { text: 'Plugin SDK', link: '/plugin-sdk' }
+      { text: "Home", link: "/" },
+      { text: "Getting Started", link: "/guide/getting-started" },
+      { text: "Plugin SDK", link: "/dev/plugin-sdk" },
+      { text: "Architecture", link: "/technical/architecture" },
     ],
 
     sidebar: [
       {
-        text: 'Core Concepts',
+        text: "User Guide",
         items: [
-          { text: 'System Architecture', link: '/architecture' },
-          { text: 'Bootstrapping Lifecycle', link: '/bootstrapping' },
-          { text: 'IPC Protocol', link: '/ipc-protocol' }
-        ]
+          { text: "Installation", link: "/guide/install" },
+          { text: "Getting Started", link: "/guide/getting-started" },
+          { text: "Command Reference", link: "/guide/command-reference" },
+          { text: "Project Roadmap", link: "/roadmap" },
+        ],
       },
       {
-        text: 'Extension & SDK',
+        text: "Developer Guide",
         items: [
-          { text: 'Command Discovery', link: '/discovery' },
-          { text: 'Plugin SDK Guide', link: '/plugin-sdk' }
-        ]
-      }
+          { text: "Developing Plugins", link: "/dev/plugin-sdk" },
+          { text: "Server API (IPC)", link: "/dev/server-api" },
+        ],
+      },
+      {
+        text: "Technical Reference",
+        items: [
+          { text: "System Architecture", link: "/technical/architecture" },
+          { text: "IPC Protocol", link: "/technical/ipc-protocol" },
+          { text: "Bootstrapping Lifecycle", link: "/technical/bootstrapping" },
+          { text: "Plugin Discovery", link: "/technical/plugin-discovery" },
+          { text: "Core Engine & Registry", link: "/technical/registry" },
+        ],
+      },
     ],
 
-    socialLinks: [
-      { icon: 'github', link: 'https://github.com/mydehq/MyCTL' }
-    ],
-
-    footer: {
-      message: 'Released under the MIT License.',
-      copyright: 'Copyright © 2026-present MydeHQ'
-    }
-  }
-})
+    socialLinks: [{ icon: "github", link: metadata.repo }],
+  },
+});
