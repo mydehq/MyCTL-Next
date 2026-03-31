@@ -1,0 +1,12 @@
+[project]
+name = "weather"
+version = "1.0.0"
+description = "Fetch real-time weather data and forecasts"
+dependencies = ["httpx"]
+
+[tool.myctl]
+api_version = "2.0.0"
+entry = "main.py"
+
+[tool.myctl.groups]
+"forecast" = "Get multi-day weather predictions"
