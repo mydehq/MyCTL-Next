@@ -58,9 +58,9 @@ Items in the strategic backlog for subsequent releases.
 - ✅ **Manifest-Driven Group Help**: Sub-group descriptions declared in `[tool.myctl.groups]` in `pyproject.toml`, applied by the discovery engine.
 - ✅ **Dependency Auto-Management**: `uv pip install <plugin_dir>` for syncing requirements into the daemon venv at discovery time.
 - ✅ **UV-Native Orchestration (V2.5)**: The Client now acts as a `uv` launcher, managing managed Python runtimes and environment sync out-of-band.
-- 📅 **Declarative Flag Engine**: Implementing `@registry.add_flag` for typed pre-parsing.
+- ✅ **Declarative Flag Engine (V2.8)**: Implementing `@registry.add_flag` for typed pre-parsing.
 - 📅 **Rich UI Injection**: Native TUI (Rich/Textual) support for interactive commands.
-- 📅 **Permission Governance**: Capability manifest enforcement for plugins.
+- 📝 **[Permission Governance](./technical/permissions.md)**: Capability manifest enforcement for plugins (Drafting Technical Spec).
 
 ## ✅ Verification Checklist
 

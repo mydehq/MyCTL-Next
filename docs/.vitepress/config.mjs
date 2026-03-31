@@ -65,6 +65,7 @@ export default withMermaid({
           { text: "Core Engine & Registry", link: "/technical/registry" },
           { text: "Plugin Discovery", link: "/technical/plugin-discovery" },
           { text: "Plugin Lifecycle", link: "/technical/lifecycle" },
+          { text: "Permission System", link: "/technical/permissions" },
         ],
       },
     ],

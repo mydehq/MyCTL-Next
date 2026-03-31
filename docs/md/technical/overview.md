@@ -37,7 +37,6 @@ sequenceDiagram
     end
 ```
 
-
 ## 🏗 Technical Specifications
 
 Explore the core components and low-level protocols that enable MyCTL's high-performance architecture.
@@ -50,3 +49,4 @@ Explore the core components and low-level protocols that enable MyCTL's high-per
 | **[Bootstrapping](./bootstrapping.md)**       | **Self-Management**    | UV-native orchestration, cold boot lifecycle, and SDK injection.     |
 | **[Registry Core](./registry.md)**            | **N-Level Routing**    | Command tree construction and the recursive dispatch loop.           |
 | **[Plugin Lifecycle](./lifecycle.md)**        | **Hooks & State**      | Periodic tasks, `on_load` initialization, and sandboxing.            |
+| **[Permission Governance](./permissions.md)** | **The Sandbox**        | Capability manifest enforcement and namespace restrictions.          |
