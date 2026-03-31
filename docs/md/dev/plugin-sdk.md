@@ -4,7 +4,7 @@ MyCTL is designed to be an extensible platform for desktop automation. By utiliz
 
 ## ⭐ The MyCTL SDK Overview
 
-The SDK provides a curated developer experience that bridges the Python daemon with the Go proxy. It features:
+The SDK provides a curated developer experience that bridges the Python daemon with the Client. It features:
 
 - **Zero-Config Injection**: No manual environment setup required for plugins.
 - **IPC Wrapping**: Automatic JSON-IPC request/response management.
@@ -159,7 +159,7 @@ async def check_battery():
 
 ## 🖥️ Client Rendering
 
-The **Go proxy** automatically renders return values based on their type:
+The **Client** automatically renders return values based on their type:
 
 - **Strings**: Printed directly to `stdout`.
 - **Dicts/Lists**: Automatically pretty-printed as **JSON**, making them pipeable to tools like `jq`.
@@ -171,4 +171,11 @@ The **Go proxy** automatically renders return values based on their type:
 1.  **Create Plugin**: `mkdir plugins/myplugin`
 2.  **Declare Dependencies**: Add requirements to `pyproject.toml`.
 3.  **Sync SDK**: Run `myctl sdk setup` to allow your IDE to resolve `myctl.api`.
-4.  **Test**: Execute `myctl <plugin_id> <command>`. The daemon reloads plugins on every boot.
+4.  **Edit & Test**: Modify your plugin code, then reload:
+    ```bash
+    myctl restart                  # Kill the cached daemon
+    myctl <plugin_id> <command>    # Triggers fresh Cold Boot
+    ```
+
+> [!WARNING]
+> **Plugins are cached in RAM.** The daemon loads all plugin code into memory once during the Cold Boot phase. Editing a plugin's `main.py` on disk has **no effect** on the running daemon. You must run `myctl restart` (or `myctl stop`) to flush the in-memory cache and force a reload on the next invocation.

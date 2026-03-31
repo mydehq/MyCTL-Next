@@ -22,9 +22,26 @@ The `PLUGIN_SEARCH_PATHS` are iterated from highest to lowest priority:
 2.  **USER Tier**: `{{metadata.paths.plugins}}` (User-specific extensions).
 3.  **SYSTEM Tier**: `/usr/share/myctl/plugins/` (System-wide defaults).
 
-### The Total Override Rule
+### The Total Override Rule (Shadowing)
 
-When the engine identifies a Plugin ID in a high-priority tier, it enters the global `loaded_plugins` set. Subsequent tiers containing a folder with the same name are **completely ignored**. This ensures that dropping a custom `audio` plugin into your local workspace eradicated the system-default `audio` namespace safely, with no risk of command collision or accidental merging.
+When the engine iterates over `PLUGIN_SEARCH_PATHS`, it maintains a `loaded_plugins` set. If a Plugin ID is identified in a high-priority tier, it is added to this set. Subsequent tiers containing a folder with the exact same name are skipped entirely:
+
+```python
+loaded_plugins = set()
+
+for root in PLUGIN_SEARCH_PATHS:
+    for plugin_dir in root.iterdir():
+        plugin_id = plugin_dir.name
+
+        # Immediate skip if shadowing a lower tier
+        if plugin_id in loaded_plugins:
+            continue
+
+        # ... logic ...
+        loaded_plugins.add(plugin_id)
+```
+
+This strict shadowing ensures `O(1)` reasoning. Dropping a custom `audio` plugin into your local workspace completely eradicates the system-default `audio` namespace. There is zero risk of command collision or accidental merging between functionally distinct layers.
 
 ---
 
@@ -63,6 +80,23 @@ This "Backward Injection" allows the exact memory address of the user's isolated
 
 ---
 
-## 5. Zero-Config SDK Availability
+## 5. Zero-Config SDK Availability (`.pth` Injection)
 
-To ensure that `import myctl.api` always works—even for plugins with no local dependencies—the Discovery Engine automatically injects a `.pth` file into the managed virtual environment's `site-packages` on every boot. This links the daemon's internal `myctl` package to the global Python path, providing a seamless "Zero-Config" developer experience.
+To ensure that `import myctl.api` always works—even for plugins with no external `$PATH` linkage—the Discovery Engine automatically injects a `.pth` file into the managed virtual environment's `site-packages` on every boot.
+
+Before analyzing the plugin directories, the daemon executes:
+
+```python
+site_packages = next(VENV_PYTHON.parent.parent.glob("lib/python*/site-packages"), None)
+
+if site_packages and site_packages.exists():
+    pth_file = site_packages / "myctl_sdk.pth"
+
+    if not pth_file.exists() or pth_file.read_text().strip() != str(DAEMON_DIR):
+        pth_file.write_text(str(DAEMON_DIR) + "\n")
+```
+
+By linking the daemon's core `DAEMON_DIR` source into the venv, this provides:
+
+- **Instant IDE Autocompletion**: The `myctl sdk setup` trick works correctly because the internal Python module paths resolve perfectly.
+- **Fail-Safe Import**: Developers can utilize `from myctl.api import ...` seamlessly without relying on `setup.py` or system PYTHONPATH hacking.

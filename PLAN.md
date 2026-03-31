@@ -1,4 +1,4 @@
-```m
+```md
 Dirs:
   CONF_FILES:
     - ${XDG_CONFIG_HOME:-$HOME/.config}/mydehq/myctl.yml

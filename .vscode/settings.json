@@ -2,5 +2,7 @@
     "python.defaultInterpreterPath": "${workspaceFolder}/daemon/.venv/bin/python",
     "python.analysis.extraPaths": [
         "${workspaceFolder}/daemon"
-    ]
+    ],
+    "files.autoSave": "afterDelay",
+    "editor.wordWrap": "off"
 }

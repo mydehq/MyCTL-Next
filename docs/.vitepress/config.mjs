@@ -27,7 +27,7 @@ export default withMermaid({
     nav: [
       { text: "Getting Started", link: "/guide/getting-started" },
       { text: "Plugin SDK", link: "/dev/plugin-sdk" },
-      { text: "Architecture", link: "/technical/architecture" },
+      { text: "Technical", link: "/technical/overview" },
     ],
 
     sidebar: [
@@ -50,11 +50,13 @@ export default withMermaid({
       {
         text: "Technical Reference",
         items: [
+          { text: "Overview", link: "/technical/overview" },
           { text: "System Architecture", link: "/technical/architecture" },
+          { text: "Bootstrapping", link: "/technical/bootstrapping" },
           { text: "IPC Protocol", link: "/technical/ipc-protocol" },
-          { text: "Bootstrapping Lifecycle", link: "/technical/bootstrapping" },
-          { text: "Plugin Discovery", link: "/technical/plugin-discovery" },
           { text: "Core Engine & Registry", link: "/technical/registry" },
+          { text: "Plugin Discovery", link: "/technical/plugin-discovery" },
+          { text: "Plugin Lifecycle", link: "/technical/lifecycle" },
         ],
       },
     ],

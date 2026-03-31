@@ -7,7 +7,7 @@ Follow these always.
 - **Always use `mise`** for toolchain management (Go, Python, Bun).
 - **Only Build Via Mise**: Never run raw `go build` or `uv sync` commands manually. Use `mise run build`.
 - **Always use `uv`** for Python environment and dependency management (triggered via `mise`).
-- **No Logic in Go**: The Go client is a $O(1)$ proxy.
+- **Minimal Client Logic**: The Client is a $O(1)$ proxy.
 - **Self-Bootstrapping**: The Python daemon manages its own isolated environment (venv).
 - **XDG Specification**: Always use `platformdirs` and XDG environment variables for path resolution.
 - **Implicit Identity**: The directory name of a plugin is its **Plugin ID**, which automatically defines its primary CLI namespace.
@@ -24,7 +24,7 @@ MyCTL is a high-performance Linux desktop controller built on a **Lean Client / 
 
 ### Core Components
 
-- **`cmd/` (Thin Proxy)**: Go binary. Fetches JSON schema from daemon at runtime to build Cobra CLI tree; forwards all execution to Python via JSON-IPC.
+- **`cmd/` (Thin Client)**: The high-performance CLI entry point. Fetches JSON schema from daemon at runtime to build Cobra CLI tree; forwards all execution to Python via JSON-IPC.
 - **`daemon/` (Smart Server)**: Python 3.13+ namespaced package. Handles self-bootstrapping, N-level command routing, and native system integrations.
 - **IPC**: Newline-delimited JSON over `$XDG_RUNTIME_DIR/myctl/myctld.sock`.
 
@@ -68,6 +68,6 @@ For deep technical dives, consult the **MyCTL Developer Portal**:
 ## 4. Development Workflow
 
 1. **Bootstrap**: `mise install`
-2. **Build**: `mise run build` (Builds Go client + syncs daemon)
+2. **Build**: `mise run build` (Builds Client + syncs daemon)
 3. **Trace**: `LOG_LEVEL=DEBUG ./daemon/myctld`
 4. **SDK Setup**: `myctl sdk setup` (Configures IDE for `myctl.api` autocompletion)

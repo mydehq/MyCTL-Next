@@ -50,7 +50,7 @@ Returns the daemon's API version.
 
 ### `__sys_schema`
 
-Returns the full command hierarchy as a JSON tree. This is used by the Go client to inflate its Cobra tree dynamically.
+Returns the full command hierarchy as a JSON tree. This is used by the Client to inflate its command tree dynamically.
 
 - **Request**: `{ "path": ["__sys_schema"] }`
 - **Response**:
@@ -73,6 +73,20 @@ Returns the full command hierarchy as a JSON tree. This is used by the Go client
 }
 ```
 
+### `__sys_logs`
+
+Returns the most recent tail activity (up to 30 lines) directly from the persistent daemon log file.
+
+- **Request**: `{ "path": ["__sys_logs"] }`
+- **Response Data**: A single multi-line string of log output.
+  ```json
+  {
+    "status": "ok",
+    "data": "15:04:05 [INFO] Daemon started...\n15:04:06 [INFO] Plugin 'audio' loaded",
+    "exit_code": 0
+  }
+  ```
+
 ---
 
 ## 📊 Runtime Status
@@ -86,10 +100,10 @@ Returns telemetry for the running process.
 
 ### `logs`
 
-Returns the path to the daemon log file.
+A user-friendly alias for `__sys_logs`. It returns the most recent 30 lines from `$XDG_STATE_HOME/myctl/daemon.log` as a single raw text string.
 
 - **Request**: `{ "path": ["logs"] }`
-- **Response Data**: `/home/user/.local/state/myctl/daemon.log`
+- **Response Data**: Multi-line string containing the recent log dump.
 
 ---
 
@@ -104,10 +118,13 @@ Initiates a graceful shutdown of the daemon process.
 
 ### `restart`
 
-The daemon terminates gracefully. The next client connection will trigger a fresh cold boot via the Go orchestrator.
+The daemon terminates gracefully. The next client connection will trigger a fresh initialization sequence, re-discovering all plugins from disk.
 
 - **Request**: `{ "path": ["restart"] }`
 - **Response**: `Daemon restarting...`
+
+> [!TIP]
+> **Plugin Development**: This is the primary mechanism for reloading edited plugin code. Since the daemon caches all plugin logic in RAM, running `myctl restart` is required after modifying any plugin's `main.py` or `pyproject.toml`.
 
 ---
 

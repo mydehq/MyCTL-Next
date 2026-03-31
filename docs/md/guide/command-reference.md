@@ -10,7 +10,7 @@ The `daemon` commands provide control over the persistent MyCTL process and its 
 | :------------------- | :------ | :----------------------------------------------------------- |
 | **`daemon status`**  | Status  | Returns whether the daemon process is alive and operational. |
 | **`daemon stop`**    | Stop    | Gracefully shuts down the Python engine.                     |
-| **`daemon version`** | Version | Displays the version of the Go proxy and the Daemon.         |
+| **`daemon version`** | Version | Displays the version of the Client and the Daemon.            |
 | **`daemon ping`**    | Health  | Simple health-check (returns `pong`).                        |
 | **`daemon start`**   | Start   | Ensures the daemon is running. (Follows logs without `-b`).  |
 | **`daemon logs`**    | Logs    | Tails the daemon log file in the foreground.                 |
@@ -60,5 +60,5 @@ User-installed plugins appear at the root of the command tree. These are discove
 
 MyCTL is designed to be a first-class citizen in shell scripts.
 
-- **Synchronous Execution**: The CLI proxy waits for the daemon's response before exiting, ensuring that sequential commands run in the correct order.
-- **Exit Codes**: The daemon passes native exit codes (0 for success, non-zero for errors) back to the proxy, allowing for standard shell error handling (`if myctl stop; then ...`).
+- **Synchronous Execution**: The Client waits for the daemon's response before exiting, ensuring that sequential commands run in the correct order.
+- **Exit Codes**: The daemon passes native exit codes (0 for success, non-zero for errors) back to the Client, allowing for standard shell error handling (`if myctl stop; then ...`).

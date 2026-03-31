@@ -36,15 +36,52 @@ self._commands = {
 
 This structural mapping guarantees that executing a 5-level deep command takes precisely the same amount of time as a top-level command.
 
-### Dynamic CLI Rehydration
+Because `self._commands` is essentially a JSON-compatible tree, the daemon can manifest its entire internal state via the `__sys_schema` command. The Client fetches this JSON on every boot and uses it to "inflate" its command tree, ensuring the client and server are always in perfect sync without manual re-compilation.
 
-Because `self._commands` is essentially a JSON-compatible tree, the daemon can manifest its entire internal state via the `__sys_schema` command. The Go proxy fetches this JSON on every boot and uses it to "inflate" its Cobra CLI tree, ensuring the client and server are always in perfect sync without manual re-compilation.
+### Tree Inflation Algorithm (`add_cmd`)
+
+During the plugin discovery phase, each call to `@registry.add_cmd` invokes the `CommandRegistry.add_cmd` method. This method is responsible for building the nested dictionary hierarchy incrementally, inserting nodes one at a time as plugins register their commands.
+
+The algorithm works as follows:
+
+1. **Ensure Root Group**: If the `plugin_id` (e.g., `"audio"`) does not yet have an entry in `self._commands`, a root group node is created.
+2. **Tokenize Path**: The command path string (e.g., `"volume set"`) is split by whitespace into a list of segments: `["volume", "set"]`.
+3. **Traverse and Grow**: The algorithm iterates over each segment, descending into the `children` map. If a segment does not exist, a new node is created:
+   - **Intermediate segments** → create a `"group"` node with an empty `children` dict.
+   - **Final segment** → create a `"command"` node with the resolved `help` string and the direct Python function pointer `handler`.
+4. **Overwrite Prevention**: Because the check `if part not in current["children"]` is used, re-registering the same path is a no-op. The first registration wins. This is consistent with the Total Override Rule at the tier level.
+
+```python
+# Simplified trace: add_cmd("audio", "volume set", set_handler, "Set volume")
+#
+# Before: self._commands = {}
+# After:
+self._commands = {
+    "audio": {
+        "type": "group",
+        "children": {
+            "volume": {
+                "type": "group",        # intermediate: created automatically
+                "children": {
+                    "set": {
+                        "type": "command",
+                        "handler": <set_handler>,
+                        "help": "Set volume",
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Group metadata (help text) is applied _after_ all `add_cmd` registrations during `discover()`, using the `groups` table from `pyproject.toml`'s `[tool.myctl]` section. This two-pass approach allows the manifest to document groups that may not yet exist when the plugin's `main.py` begins executing.
 
 ---
 
 ## 2. Dispatch & Execution Flow
 
-When a user executes `myctl audio volume set 50`, the Go proxy tokenizes the path and passes `["audio", "volume", "set"]` to the daemon over IPC.
+When a user executes `myctl audio volume set 50`, the Client tokenizes the path and passes `["audio", "volume", "set"]` to the daemon over IPC.
 
 The Registry executes the dispatch in two sub-millisecond steps:
 
@@ -62,3 +99,26 @@ await current["handler"](request)
 ```
 
 By strictly utilizing memory pointers rather than string-based evaluation, the core routing loop achieves native execution speed, moving from the network socket to the function logic in microseconds.
+
+### Path Resolution Strategy
+
+The actual `dispatch` method in `CommandRegistry` has an important subtlety: it must determine not only _which_ handler to invoke, but also which portion of the request's `path` array represents the command route vs. the user-supplied arguments.
+
+The resolver uses an `args_start_idx` cursor that advances as each tree segment is matched:
+
+```python
+current = self._commands[plugin_id]    # Start at the plugin root node
+args_start_idx = 1
+
+for i in range(1, len(req.path)):
+    part = req.path[i]
+    if "children" in current and part in current["children"]:
+        current = current["children"][part]  # Descend the tree
+        args_start_idx = i + 1              # Advance cursor past matched segment
+    else:
+        break                               # Unknown segment = start of user args
+```
+
+After traversal, `req.args` is sliced from `args_start_idx` onward. This allows a command registered as `"volume set"` to correctly receive `["50"]` in its `req.args` when the user runs `myctl audio volume set 50`, even though the original `req.path` was `["audio", "volume", "set", "50"]`.
+
+If traversal terminates on a `"group"` node (i.e., the user didn't provide a full command path), the daemon returns an `err()` response with the group's help text, which the Cobra client then renders as a formatted help page.

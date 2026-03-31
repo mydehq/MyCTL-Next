@@ -6,7 +6,7 @@ MyCTL is designed to be a high-performance system controller that runs with mini
 
 Ensure the following tools are available in your system path:
 
-1.  **[Go 1.22+]({{metadata.tools.go}})**: Used to build and compile the lean CLI proxy.
+1.  **[Go 1.22+]({{metadata.tools.go}})**: Used to build and compile the lean CLI Client.
 2.  **[uv]({{metadata.tools.uv}})**: Our primary runtime orchestrator. `uv` manages the Python environment, dependencies, and daemon bootstrapping.
 
 > [!NOTE]
@@ -18,9 +18,9 @@ Ensure the following tools are available in your system path:
 
 MyCTL uses `mise` for streamlined task management (optional but recommended).
 
-### 1. Build the CLI Binary
+### 1. Build the Client
 
-Compile the Go proxy from the project root:
+Compile the Client from the project root:
 
 ```bash
 go build -o ./bin/myctl ./cmd
