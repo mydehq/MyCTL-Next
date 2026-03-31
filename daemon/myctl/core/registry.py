@@ -130,7 +130,7 @@ class CommandRegistry:
             return ok("Daemon started successfully.")
         return ok("Daemon is already running and operational.")
 
-    async def _sys_restart(self) -> Dict[str, Any]:
+    async def _sys_restart(self, req: Request) -> Dict[str, Any]:
         import asyncio
         import sys
 
