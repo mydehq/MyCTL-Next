@@ -1,31 +1,47 @@
 # Installation Guide
 
-::: warning 
-**{{metadata.title}}** is currently in active development. Features and APIs are subject to change.
-:::
+MyCTL is designed to be a high-performance system controller that runs with minimal system dependencies. This guide covers the two primary tools required to build and execute the system.
 
-To install, ensure you have both <a :href="metadata.miseHome" target="_blank">mise</a> and **uv** installed on your system.
+## 🛠 Prerequisites
 
-Then, execute these commands to set up the project:
+Ensure the following tools are available in your system path:
 
-```bash-vue
-# Clone the repo
-git clone {{metadata.repo}}
+1.  **[Go 1.22+]({{metadata.tools.go}})**: Used to build and compile the lean CLI proxy.
+2.  **[uv]({{metadata.tools.uv}})**: Our primary runtime orchestrator. `uv` manages the Python environment, dependencies, and daemon bootstrapping.
 
-# Switch to the next branch (active development)
-cd MyCTL
-git switch next
+> [!NOTE]
+> **Minimal System Requirement**: You do **not** need a globally installed Python 3 shell to use MyCTL. `uv` will automatically download and manage its own private Python runtime for the daemon.
 
-# Build the Go proxy
-mise run build
-```
+---
 
-## The First Run (Cold Boot)
+## 🏗 Building from Source
 
-You do **not** need to manually start the daemon. MyCTL is designed to be self-healing. When you run your first command, the Go proxy will detect the missing daemon and trigger a **Cold Boot**:
+MyCTL uses `mise` for streamlined task management (optional but recommended).
+
+### 1. Build the CLI Binary
+
+Compile the Go proxy from the project root:
 
 ```bash
-myctl ping
+go build -o ./bin/myctl ./cmd
 ```
 
-Depending on your system, the first run may take a few seconds as `uv` creates the isolated virtual environment and syncs dependencies. Subsequent commands will respond in sub-milliseconds.
+### 2. Verify UV Availability
+
+MyCTL relies on `uv` to orchestrate the daemon. Confirm it is installed:
+
+```bash
+uv --version
+```
+
+---
+
+## 🚀 The First Run
+
+Once built, you can trigger the **Universal Orchestration** by running any command. This will prompt `uv` to create the isolated environment and sync all core dependencies:
+
+```bash
+./bin/myctl start
+```
+
+For professional desktop installations, you may wish to add the `./bin` directory to your shell's `PATH`.

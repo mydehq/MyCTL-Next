@@ -25,7 +25,6 @@ export default withMermaid({
     logo: "/icon.svg",
 
     nav: [
-      { text: "Home", link: "/" },
       { text: "Getting Started", link: "/guide/getting-started" },
       { text: "Plugin SDK", link: "/dev/plugin-sdk" },
       { text: "Architecture", link: "/technical/architecture" },

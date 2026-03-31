@@ -2,6 +2,9 @@
 layout: home
 
 hero:
+  name: "MyCTL"
+  text: "High-Performance Linux Desktop Controller"
+  tagline: "A Logic-Less Go Proxy Orchestrating a Persistent Python Engine"
   image:
     src: /icon.svg
     alt: MyCTL Logo
@@ -12,16 +15,16 @@ hero:
       link: /guide/getting-started
 
     - theme: alt
-      text: "Architecture"
+      text: "Architecture Guide"
       link: /technical/architecture
 
 features:
   - title: "⚡️ Sub-ms Proxy"
-    details: "The Go client is a pure O(1) tunnel, stripping all Cobra logic for lightning-fast command execution."
-  - title: "🐍 Intelligent Daemon"
-    details: "A self-bootstrapping Python server that creates its own isolated sandbox and manages system state persistently."
-  - title: "🧩 Infinite Nesting"
-    details: "Deeply nested hierarchical commands like 'audio sink mute' are natively supported through our N-Level registry."
-  - title: "🛠️ SDK-First Design"
-    details: "The 'myctl.api' package provides a curated developer experience with full IDE type-hinting and autocompletion."
+    details: "Universal UV Orchestration ensures sub-millisecond execution times and zero-dependency system portability."
+  - title: "🍱 Managed Runtime"
+    details: "The Python engine is strictly sandboxed. UV automatically manages Python versions and tiered dependencies on every boot."
+  - title: "🧩 Recursive N-Level Commands"
+    details: "Our dynamic Cobra rehydration supports infinite-depth hierarchical commands like 'audio sink volume set' natively."
+  - title: "🛠️ SDK-First Extensions"
+    details: "The 'myctl.api' package provides a Zero-Config developer experience with full IDE type-hinting and autocompletion."
 ---

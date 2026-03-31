@@ -1,0 +1,15 @@
+[project]
+name = "sysinfo"
+version = "1.0.0"
+description = "System resource monitoring and diagnostics"
+dependencies = ["psutil>=5.9.0"]
+
+[tool.myctl]
+api_version = "2.0.0"
+entry = "main.py"
+
+[tool.myctl.groups]
+"cpu"    = "CPU usage and frequency stats"
+"mem"    = "Memory and swap usage"
+"disk"   = "Disk partitions and I/O"
+"net"    = "Network interface statistics"

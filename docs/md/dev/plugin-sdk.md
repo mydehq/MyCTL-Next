@@ -1,157 +1,113 @@
-# Plugin SDK Guide
+# Plugin SDK: Building System Extensions
 
-Developing a plugin for MyCTL is designed to be frictionless. By utilizing the **Zero-Boilerplate SDK**, developers can expose complex system functionality to the CLI without writing any networking or parsing logic.
+MyCTL is designed to be an extensible platform for desktop automation. By utilizing the **`myctl.api`** Python package, developers can create sophisticated system-native integrations with minimal boilerplate.
 
-## 🏗️ Technical Foundation
+## ⭐ The MyCTL SDK Overview
 
-### 1. The Plugin ID (Implicit Identity)
+The SDK provides a curated developer experience that bridges the Python daemon with the Go proxy. It features:
 
-The directory name where your plugin resides is its **Plugin ID**. This ID becomes the root command namespace for all functions defined within that folder.
+- **Zero-Config Injection**: No manual environment setup required for plugins.
+- **IPC Wrapping**: Automatic JSON-IPC request/response management.
+- **Type Hinting**: Full autocompletion support for IDEs.
+- **Lifecycle Hooks**: Professional-grade `@on_load` and `@periodic` hooks.
 
-Example: If your folder is `plugins/weather/`, your commands will automatically be prefixed with `myctl weather`.
+---
 
-### 2. The Sandbox Model
+## 🏗 Plugin Structure
 
-Plugins are executed inside a dedicated `uv` virtual environment. The daemon handles:
+Every MyCTL plugin must follow a strict directory-based identity.
 
-- **Dependency Management**: Automatically mirrors requirements defined in the plugin's metadata.
-- **Isolation**: Each plugin is loaded as an independent module via `importlib`.
+```text
+plugins/
+└── sysinfo/             <-- Plugin ID (must match directory)
+    ├── pyproject.toml   <-- Manifest (Dependencies & Metadata)
+    └── main.py          <-- Logic (Command handlers)
+```
 
-## 📦 Anatomy of a Plugin
+### 1. The Manifest (`pyproject.toml`)
 
-Every plugin must contain two mandatory files:
+MyCTL reads `[project]` for packaging metadata and `[tool.myctl]` for engine-specific configuration.
 
-### `pyproject.toml`
-
-The standard Python manifest. MyCTL reads `[project]` for packaging metadata and `[tool.myctl]` for engine-specific configuration.
+> [!IMPORTANT]
+> **Name Enforcement**: The `[project].name` field MUST match the directory name exactly.
 
 ```toml
 [project]
-name = "weather"               # MUST match the plugin directory name exactly
+name = "sysinfo"               # MUST match the directory name
 version = "1.0.0"
-description = "Quickly fetch current weather data"  # root group help
-dependencies = ["requests", "rich"]
+description = "System Monitor"  # Root group help text
+dependencies = ["psutil>=5.9.0"]
 
 [tool.myctl]
-api_version = "2.0.0"           # Must match the running daemon's major version
-entry = "main.py"               # Entry point (omit to use default: main.py)
+api_version = "{{metadata.versions.api_ver}}"
+entry = "main.py"               # Entry point (default: main.py)
 
-[tool.myctl.groups]             # Optional: help text for sub-command groups
-"forecast"        = "Multi-day forecast commands"
-"forecast daily"  = "Daily breakdown"    # nested group — space-separated path
+[tool.myctl.groups]             # Optional: help text for sub-groups
+"cpu info" = "CPU detailed statistics"
 ```
 
-| Field          | Table                 | Purpose                                                                                       |
-| -------------- | --------------------- | --------------------------------------------------------------------------------------------- |
-| `name`         | `[project]`           | **Must equal the directory name.** Mismatches cause the plugin to be rejected at load time.   |
-| `version`      | `[project]`           | Semantic version                                                                              |
-| `description`  | `[project]`           | Help text for the plugin's **root** command group                                             |
-| `dependencies` | `[project]`           | Installed by `uv` automatically                                                               |
-| `api_version`  | `[tool.myctl]`        | SDK compatibility check                                                                       |
-| `entry`        | `[tool.myctl]`        | Entry point file (default: `main.py`)                                                         |
-| `"<path>"`    | `[tool.myctl.groups]` | Help text for a sub-group (space-separated path, e.g. `"volume set"`)                        |
+| Field          | Table                 | Purpose                                                                                     |
+| -------------- | --------------------- | ------------------------------------------------------------------------------------------- |
+| `name`         | `[project]`           | **Must equal the directory name.** Mismatches cause the plugin to be rejected at load time. |
+| `description`  | `[project]`           | Help text for the plugin's **root** command group                                           |
+| `dependencies` | `[project]`           | Installed by `uv` automatically into the daemon's sandbox.                                  |
+| `api_version`  | `[tool.myctl]`        | SDK compatibility check (e.g. `1.0.0`).                                                     |
+| `"<path>"`     | `[tool.myctl.groups]` | Help text for a sub-group (space-separated path, e.g. `"cpu info"`)                         |
 
-### `main.py` (The Entry Point)
+### 2. Dependency Management: The UV Advantage
 
-This is where you define your logic using the `@registry` decorator.
+MyCTL utilizes **`uv`** to automatically resolve and install plugin dependencies at discovery time.
 
-```python
-from myctl.api import registry, ok, err
+- **Isolation**: Dependencies are synced directly into the daemon's managed virtual environment (`{{metadata.paths.venv}}`).
+- **Speed**: `uv` ensures that checking for updates or installing new requirements happens in milliseconds during the daemon's Cold Boot.
 
-@registry.add_cmd("get", help="Fetch the current temperature")
-async def get_weather(req):
-    # Your async logic here
-    return ok("The temperature is 22°C")
-```
+---
 
-## 🛠️ The `registry` API
+## 🛠 Command Registration
 
-The SDK is exposed via `myctl.api`. Import what you need:
+Commands are registered using the `registry` proxy from the `myctl.api` package.
 
 ```python
 from myctl.api import registry, ok, err, Request
+
+@registry.add_cmd(path="cpu load", help="Displays current CPU usage")
+async def get_cpu_load(req: Request):
+    import psutil
+    usage = psutil.cpu_percent(interval=1)
+    return ok(f"CPU Load: {usage}%")
 ```
 
-### `@registry.add_cmd(path, help="")`
+### The `Request` Object
 
-Registers an `async` function as a CLI command under the plugin's namespace.
-
-- **`path`**: The subcommand name. Use **space-separated strings** for deep nesting — the engine builds the full hierarchy automatically.
-- **`help`**: Description shown in `myctl <plugin> --help`.
-
-```python
-@registry.add_cmd("volume set", help="Set volume to a percentage")
-async def volume_set(req: Request):
-    ...
-```
-
-This registers `myctl <plugin> volume set` as a command, with `volume` automatically created as an intermediate group.
-
-### The `req` Object
-
-Every handler receives a `Request` object:
+Every handler receives a `req` object containing context from the user's terminal:
 
 | Field  | Type             | Description                                           |
 | ------ | ---------------- | ----------------------------------------------------- |
-| `path` | `list[str]`      | Full command path (e.g. `["audio", "volume", "set"]`) |
+| `path` | `list[str]`      | Full command path (e.g. `["sysinfo", "cpu", "load"]`) |
 | `args` | `list[str]`      | Raw positional arguments from the user                |
-| `cwd`  | `str`            | Working directory where the user ran `myctl`          |
-| `env`  | `dict[str, str]` | User's environment variables                          |
-
-### Argument Parsing (`req.args`)
-
-Arguments are passed as a raw list — parse them manually:
-
-```python
-@registry.add_cmd("volume set", help="Set volume to a percentage")
-async def volume_set(req: Request):
-    if not req.args:
-        return err("Usage: myctl audio volume set <0-100>")
-    level = req.args[0]
-    return ok(f"Volume set to {level}%")
-```
+| `cwd`  | `str`            | Directory where the user executed the command         |
+| `env`  | `dict[str, str]` | User's environment variables (e.g. `$DISPLAY`)        |
 
 ### Response Helpers: `ok()` and `err()`
 
-Always return one of the two SDK response helpers — never return a raw value directly.
+> [!IMPORTANT]
+> **Mandatory Returns**: Every handler MUST return one of the SDK response helpers. Raw strings, integers, or `None` are strictly prohibited and will result in a **System Error**.
 
 ```python
-from myctl.api import ok, err
+# Success: Data can be a string, dict, or list
+return ok("Task complete")
+return ok({"status": "online", "tasks": 5})
 
-# Success — data can be a string, dict, or list
-return ok("Done")
-return ok({"level": 50, "muted": False})
-
-# Failure — sets exit_code to 1 by default (overridable)
+# Failure: Sets CLI exit_code to 1 by default
 return err("Device not found")
-return err("Permission denied", exit_code=3)
+return err("Permission denied", exit_code=13)
 ```
 
-The `exit_code` is passed back to the shell, enabling script integration via `$?`.
+---
 
+## 📋 Logging & Observability
 
-### `@registry.on_load`
-
-Registers an `async` function to run **once** after the plugin has been fully loaded, during the daemon's boot phase. Use it for one-time setup like connecting to hardware or verifying system state.
-
-```python
-from myctl.api import registry
-
-pulse = None
-
-@registry.on_load
-async def setup():
-    global pulse
-    import pulsectl_asyncio
-    pulse = pulsectl_asyncio.PulseAsync("myctl-audio")
-    await pulse.connect()
-```
-
-If the hook raises an exception, the error is logged and the daemon continues — the plugin remains loaded but the setup is skipped.
-
-## 📋 Logging
-
-Plugins have access to a named logger that writes to the daemon's log file (`$XDG_STATE_HOME/myctl/daemon.log`). The logger is automatically scoped to `myctl.plugin.<plugin_id>` during discovery.
+Plugins have access to a scoped logger that writes to the central daemon log file (`{{metadata.paths.logs}}`).
 
 ```python
 from myctl.api import logger
@@ -160,60 +116,59 @@ from myctl.api import logger
 async def get_status(req):
     logger.info("Fetching sink status...")
     logger.debug("req.args: %s", req.args)
-    return ok("Sink is online")
+    return ok("Online")
 ```
 
-For plugins that prefer an explicit name, use `get_logger`:
+---
+
+## 🚀 Lifecycle Hooks
+
+### `@registry.on_load`
+
+Registers an `async` function to run **once** during the daemon's boot phase after the plugin is loaded. Use it for initialization (e.g., establishing hardware connections).
 
 ```python
-from myctl.api import get_logger
-log = get_logger("audio")  # → myctl.plugin.audio
+@registry.on_load
+async def init_hardware():
+    logger.info("Connecting to system sensors...")
 ```
 
+> [!IMPORTANT]
+> **Fail-Fast Boot**: If any `@on_load` hook fails, the **entire plugin is rejected** for the session and hidden from the CLI. This ensures system stability. If your initialization is "optional", wrap it in a `try/except` block.
 
-## 🖥️ Return Values & Client Rendering
+### `@registry.periodic(seconds=N)`
 
-Plugins return plain Python objects. The **Go client** is responsible for rendering them to the terminal after they travel through the IPC response — the plugin itself has no knowledge of the terminal.
+Registers an `async` function to run in the **background** every `N` seconds. These tasks begin execution once the plugin is fully loaded and `on_load` has completed.
 
-### Strings
-
-Return a plain string and it's printed directly to `stdout`, no formatting applied.
+- **Use case**: Polling hardware, refreshing API tokens, monitoring system state.
+- **Note**: Periodic tasks run in parallel; ensure they are lightweight and do not block the event loop.
 
 ```python
-@registry.add_cmd("hello")
-async def hello(req):
-    return "Hello from MyCTL!"
+@registry.periodic(seconds=60)
+async def check_battery():
+    # Runs every minute in the background
+    level = await get_battery_level()
+    if level < 15:
+        logger.warning(f"Battery low: {level}%")
 ```
 
-```text
-Hello from MyCTL!
-```
+> [!NOTE]
+> **Resilient Runtime**: If a background task crashes, it is logged, but the engine **retries** the task at its next defined interval.
 
-### Structured Data (Dicts & Lists)
+---
 
-Return a `dict` or `list` and the Go Proxy automatically **pretty-prints it as JSON**. This makes your output pipeable to tools like `jq` with no extra effort.
+## 🖥️ Client Rendering
 
-```python
-@registry.add_cmd("info")
-async def get_info(req):
-    return {
-        "status": "active",
-        "version": "1.0.2",
-        "tags": ["prod", "system"]
-    }
-```
+The **Go proxy** automatically renders return values based on their type:
 
-```json
-{
-  "status": "active",
-  "version": "1.0.2",
-  "tags": ["prod", "system"]
-}
-```
+- **Strings**: Printed directly to `stdout`.
+- **Dicts/Lists**: Automatically pretty-printed as **JSON**, making them pipeable to tools like `jq`.
 
-## 🛠️ Development Workflow
+---
 
-1. **Create the Folder**: `mkdir plugins/myplugin`
-2. **Setup SDK Links**: Run `myctl sdk setup` to allow your IDE to resolve `myctl.api` imports.
-3. **Write Code**: Define your commands in `main.py`.
-4. **Instant Hot-Reload**: The daemon detects changes in plugin directories. Simply run `myctl myplugin <command>` to see the new logic in action.
+## ✅ Development Workflow
+
+1.  **Create Plugin**: `mkdir plugins/myplugin`
+2.  **Declare Dependencies**: Add requirements to `pyproject.toml`.
+3.  **Sync SDK**: Run `myctl sdk setup` to allow your IDE to resolve `myctl.api`.
+4.  **Test**: Execute `myctl <plugin_id> <command>`. The daemon reloads plugins on every boot.

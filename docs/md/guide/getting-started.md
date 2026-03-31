@@ -1,58 +1,68 @@
 # Getting Started
 
-Welcome to **{{ metadata.title }}**, {{ metadata.description }}
-This guide will get you up and running in minutes.
+Welcome to **MyCTL**, the high-performance desktop controller for Linux. This guide covers how to quickly initialize the system and explore your first system commands.
 
-## Quickstart
+## Architecture: The Lean Proxy
 
-Follow the [Installation Guide](./install.md) to install **{{metadata.title}}** in your system
+MyCTL operates on a **Lean Client / Fat Server** architecture.
 
-### 1. Test the Connection
+- **Go Proxy (`myctl`)**: A sub-millisecond $O(1)$ CLI that handles user input and displays output.
+- **Python Daemon (`myctld`)**: The persistent engine that manages system state and third-party plugins.
 
-Verify that MyCTL can talk to its intelligent daemon:
+> [!NOTE]
+> **Orchestration**: The Go proxy uses `uv` to automatically bootstrap the daemon. You don't need to manually start the server before using MyCTL.
+
+---
+
+## 🚀 The First Run
+
+After [Installation](./install.md), verify the connection by running a simple health check:
 
 ```bash
 myctl ping
 ```
 
+If this is your first time running MyCTL:
+
+1.  **Cold Boot**: The Go client detects the daemon is offline.
+2.  **UV Sync**: `uv` automatically downloads a private Python runtime and syncs all engine dependencies.
+3.  **Ready Signal**: Once the daemon is fully initialized, it signals the proxy to proceed.
+
 **Output:** `pong`
 
-If the daemon is not running, MyCTL will automatically trigger a **Cold Boot**, setting up its isolated virtual environment and starting the background process for you. This may take a few seconds on the first run.
+---
 
-### 2. Check System Audio
+## 🔊 Exploring Built-ins
 
-One of the core built-in features is PulseAudio/PipeWire control:
+MyCTL includes several native system integrations. Try the audio namespace:
 
 ```bash
-# Get the current audio status
-myctl audio status
+# List all system audio outputs
+myctl audio sink list
 
-# Mute the default output sink
+# Mute your default speaker
 myctl audio sink mute
 
-# List all available sinks
-myctl audio sink list
+# Check the current daemon status
+myctl daemon status
 ```
 
-### 3. Manage the Daemon
+---
 
-You can manually control the persistent MyCTL process using the `daemon` namespace:
+## 🛠 Developer Ecosystem
+
+If you're a developer, you can quickly configure your environment for building plugins:
 
 ```bash
-# Check if the daemon is currently running
-myctl daemon status
-
-# Gracefully stop the daemon
-myctl daemon stop
-
-# Start the daemon in the foreground (useful for debugging)
-myctl daemon start --foreground
+myctl sdk setup
 ```
+
+This command initializes the **MyCTL SDK**, ensuring that your IDE (like VS Code) has full autocompletion support for the `myctl.api` package.
 
 ---
 
 ## What's Next?
 
-- **[Command Reference](/guide/command-reference)**: Explore the full list of available CLI commands.
-- **[Plugin SDK](/plugins/plugin-sdk)**: Learn how to build your own system integrations using Python.
-- **[System Architecture](/technical/architecture)**: Understand the "Lean Go / Fat Python" design.
+- **[Command Reference](./command-reference.md)**: Full list of built-in commands.
+- **[Plugin SDK](../dev/plugin-sdk.md)**: Build your own system extensions.
+- **[Technical: Bootstrapping](../technical/bootstrapping.md)**: Deep dive into the `uv` orchestration layer.

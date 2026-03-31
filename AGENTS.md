@@ -13,6 +13,7 @@ Follow these always.
 - **Implicit Identity**: The directory name of a plugin is its **Plugin ID**, which automatically defines its primary CLI namespace.
 - **Name Enforcement**: `[project].name` in a plugin's `pyproject.toml` **must** match the directory name exactly, or the plugin is rejected at load time.
 - Always update docs after changes if needed.
+- **Documentation Cohesion**: Every documentation edit must be synthesized into the existing content. Do not simply append information; ensure the tone, structure, and technical flow feel unified and professionally authored.
 - Use [roadmap](./docs/md/roadmap.md) as roadmap. Update it when needed.
 
 ---

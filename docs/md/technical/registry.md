@@ -1,26 +1,31 @@
-# Registry: Internal Engine Routing
+# Command Registry: The O(1) Routing Engine
 
-The Python server acts as a continuously running async loop. To maintain sub-millisecond execution times, the daemon utilizes the `CommandRegistry` class to cache all available features into an $O(1)$ resolvable dictionary memory map.
+To maintain sub-millisecond execution times, the MyCTL daemon utilizes a specialized `CommandRegistry` that caches every available feature into an **$O(1)$ resolvable memory map**.
 
-The registry itself does not care *how* a command was registered (whether natively or via a sandboxed plugin)—its exclusive job is holding references to memory addresses and instantly routing incoming IPC network payloads to the correct Python function.
+The registry acts as the central link between the isolated plugin sandboxes and the IPC server loop, holding direct references to Python function pointers for instant dispatch.
 
-## 1. O(1) Memory Tree (`self._commands`)
+---
 
-Command dispatch must be instantaneous. Regular expressions or deep sequential string scanning are too expensive for a CLI proxy.
+## 1. The N-Level Memory Tree
 
-To resolve this, the `CommandRegistry` converts raw strings like `add_cmd("volume set")` into a deeply nested, N-dimensional Python `dict`:
+Command dispatch speed must be independent of its depth. Regular expressions or sequential string scanning are too expensive for a real-time system controller.
+
+The `CommandRegistry` bypasses these costs by converting command paths (e.g., `audio volume set`) into a deeply nested Python dictionary structure during the discovery phase:
 
 ```python
 self._commands = {
     "audio": {
         "type": "group",
+        "help": "System audio controls",
         "children": {
             "volume": {
                 "type": "group",
+                "help": "Volume adjustment",
                 "children": {
                     "set": {
                         "type": "command",
-                        "handler": <function memory_address>
+                        "help": "Set volume (0-100)",
+                        "handler": <function_pointer_at_0x7f...>
                     }
                 }
             }
@@ -29,28 +34,31 @@ self._commands = {
 }
 ```
 
-This guarantees executing a 5-level deep command takes precisely the exact same sub-millisecond timeframe as executing a root command.
+This structural mapping guarantees that executing a 5-level deep command takes precisely the same amount of time as a top-level command.
 
-### Dynamic Tree Inflation (`schema`)
-Because `self._commands` structurally matches a generic JSON topology (`group` vs `command`), the daemon can instantly walk this tree and dump it outwards over `.sock`. This is exactly how the `schema` system handler operates to rebuild the Cobra CLI automatically on the Go side.
+### Dynamic CLI Rehydration
 
-## 2. Dispatch Mechanics
+Because `self._commands` is essentially a JSON-compatible tree, the daemon can manifest its entire internal state via the `__sys_schema` command. The Go proxy fetches this JSON on every boot and uses it to "inflate" its Cobra CLI tree, ensuring the client and server are always in perfect sync without manual re-compilation.
 
-When the user runs `myctl audio volume set`, the Go proxy literally passes the tokenized array `["audio", "volume", "set"]` to Python over IPC.
+---
 
-The Daemon loop simply executes the array structurally:
-1. `plugin_id = req.path[0]` (Extracts `"audio"`)
-2. Traverses recursively through the `children` keys using loop iterators.
+## 2. Dispatch & Execution Flow
+
+When a user executes `myctl audio volume set 50`, the Go proxy tokenizes the path and passes `["audio", "volume", "set"]` to the daemon over IPC.
+
+The Registry executes the dispatch in two sub-millisecond steps:
+
+1.  **Traversal**: The engine uses the tokenized array to recursively descend the `children` map.
+2.  **Execution**: Once it reaches the leaf node (the `"command"` type), it captures the `handler` pointer and executes it.
 
 ```python
-current = self._commands[plugin_id]
+# Conceptual dispatch logic
+current = self._commands[path[0]]
+for segment in path[1:]:
+    current = current["children"][segment]
 
-# Lightning-fast constant-time key traversal
-for part in req.path[1:]:
-    current = current["children"][part]
-
-# Await the execution of the final payload dictionary function pointer
-await current["handler"](req)
+# Await the execution of the isolated plugin logic
+await current["handler"](request)
 ```
 
-By utilizing strict pointers to memory (`<function memory_address>`), the core routing loop achieves native execution speed without ever parsing domains, relying entirely on the memory dictionary graph compiled during the boot phase.
+By strictly utilizing memory pointers rather than string-based evaluation, the core routing loop achieves native execution speed, moving from the network socket to the function logic in microseconds.

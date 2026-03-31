@@ -1,82 +1,68 @@
-# Plugin Discovery Engine
+# Plugin Discovery: The Extension Engine
 
-The MyCTL daemon features a high-performance **Discovery Engine** that automatically builds the universal command tree by scanning structured plugins across external directories.
-
-It guarantees secure memory execution by strictly sandboxing code logic through standard `importlib` and "Total Override" rules.
-
+The MyCTL daemon features a high-performance **Discovery Engine** that automatically constructs the universal command tree by scanning structured plugins across a tiered hierarchy of directories.
 
 ## 1. Implicit Identity
 
-When MyCTL boots (or is commanded to refresh), the engine systematically scans the plugin tiers (e.g., `plugins/`).
+MyCTL leverages the concept of **Directory-as-Identity**. Instead of requiring developers to register their plugins with a central configuration file, the literal name of the directory a plugin resides in becomes its intrinsic **Plugin ID** and root namespace.
 
-Instead of demanding complex registration objects from developers, the daemon leverages the concept of **Directory-as-Identity**. The literal name of the directory a plugin resides in becomes its intrinsic **Plugin ID** and root namespace.
+For example, if the engine scans `plugins/weather/`, the CLI structure `myctl weather` is automatically reserved. This ID is used as the primary key for the daemon's $O(1)$ routing table.
 
-If the engine scans `plugins/weather/`, the CLI structure `myctl weather` is automatically reserved. The ID becomes the overarching path identifier mapped deeply into the daemon's routing logic.
+---
 
+## 2. Tiered Discovery & Total Override
 
-## 2. Discovery Tiers & Total Override
+The engine supports a tiered override system, allowing developers and users to shadow default system functionality without modifying core files.
 
-Because the engine utilizes Implicit Identity (Folder Name = Plugin ID), the daemon inherently supports complete plugin replacement. User plugins completely override System plugins.
+### The Search Hierarchy
 
-The internal array `PLUGIN_SEARCH_PATHS` stringently iterates directories from Highest Priority (Local Workspaces) downward to Lowest Priority (System Linux files).
+The `PLUGIN_SEARCH_PATHS` are iterated from highest to lowest priority:
 
-```python
-PLUGIN_SEARCH_PATHS = [
-    DAEMON_DIR.parent / "plugins",    # Highest Priority (DEV Root Directory)
-    USER_PLUGINS_PATH,                # Mid Priority (USER ~/.local/share/)
-    Path("/usr/share/myctl/plugins")  # Lowest Priority (SYSTEM Default)
-]
-```
+1.  **DEV Tier**: `plugins/` (Local project workspace).
+2.  **USER Tier**: `{{metadata.paths.plugins}}` (User-specific extensions).
+3.  **SYSTEM Tier**: `/usr/share/myctl/plugins/` (System-wide defaults).
 
-**The Total Override Rule**: 
-When discovering extensions, the Engine tracks active names via `loaded_plugins = set()`. If an `audio` folder is successfully discovered and dynamically linked from the `DEV` priority tier, `audio` enters the tracking state.
+### The Total Override Rule
 
-When the scanner subsequently sweeps the `USER` and `SYSTEM` tiers, they are systematically blocked from merging or executing against the `audio` command struct. This ensures that dropping a custom codebase in a high-priority folder completely eradicates default system alternatives safely without corrupting namespace merging.
+When the engine identifies a Plugin ID in a high-priority tier, it enters the global `loaded_plugins` set. Subsequent tiers containing a folder with the same name are **completely ignored**. This ensures that dropping a custom `audio` plugin into your local workspace eradicated the system-default `audio` namespace safely, with no risk of command collision or accidental merging.
 
+---
 
-## 3. Dynamic Loading (`importlib`)
+## 3. Sandboxed Dynamic Loading
 
-To run custom python code, MyCTL cannot simply execute external scripts (which ruins stateful memory) or natively `import` plugins directly into the daemon's core namespace (which allows unsafe pointer collisions across independent features).
-
-Instead, the `CommandRegistry.discover()` loop utilizes Python's `importlib.util` library to safely sandbox external developer logic inside the single running process.
+To execute external code without polluting the daemon's core memory space, MyCTL uses Python's `importlib.util` to create isolated module sandboxes.
 
 ```python
-# 1. We construct an isolated module spec mapped explicitly to 'main.py'
+# 1. Construct a module spec for the plugin entry point (main.py)
 spec = importlib.util.spec_from_file_location(plugin_id, str(entry_path))
 
-# 2. We initialize an empty memory sandbox module layout
+# 2. Initialize an isolated module object
 module = importlib.util.module_from_spec(spec)
 
-# 3. We execute the user's codebase strictly inside this sandbox
+# 3. Execute the plugin code exclusively within this sandbox
 if spec.loader:
     spec.loader.exec_module(module)
 ```
 
-By manually generating the module execution, MyCTL prevents arbitrary `init` pollution and guarantees that every extension thinks it's completely isolated.
+By manually orchestrating the module execution, MyCTL prevents `init` pollution and ensures that every extension is strictly isolated from its neighbors.
 
+---
 
-## 4. The SDK `_hook` Injection
+## 4. The SDK Bridge (`_dispatch_hook`)
 
-A major technical hurdle arises with heavily sandboxed modules: If developers use the official SDK (`from myctl.api import registry`), how does that sandbox talk *backward* to the actual `CommandRegistry` class engine running it?
+A unique technical challenge exists: how do functions decorated with `@registry.add_cmd` inside a sandbox communicate back to the central `CommandRegistry`?
 
-The engine employs a low-level dependency injection known as the **`_hook` Override**.
+The engine employs a **Temporary Dispatch Hook**. During the loading cycle of a specific plugin, the central `myctl.api` module is briefly injected with a function pointer from the engine core:
 
-During the discovery iteration of a specific active plugin, the central `myctl.api` module momentarily receives a function pointer directly from the Engine Core:
+1.  **Injection**: The Engine sets `myctl.api._dispatch_hook` to a local closure that knows the current `plugin_id`.
+2.  **Execution**: The plugin's `main.py` is executed. The `@registry.add_cmd` decorator detects the hook and fires it.
+3.  **Registration**: The hook passes the command path and the `async def` reference back to the central registry.
+4.  **Cleansing**: Once the plugin is loaded, the hook is reset to `None` to prevent accidental registration from other modules.
 
-```python
-import myctl.api
+This "Backward Injection" allows the exact memory address of the user's isolated logic to pass securely into the Daemon's routing map without breaching the module boundary.
 
-# Define a hook that forwards instantly to the active Engine class
-def _hook(path: str, help: str, func: Callable):
-    self.add_cmd(plugin_id, path, func, help)
+---
 
-# Temporarily strap the mapping hook to the public SDK
-myctl.api._dispatch_hook = _hook
+## 5. Zero-Config SDK Availability
 
-# [Sandbox Exec: spec.loader.exec_module(module)]
-
-# Instantly strip the hook once the file finishes compiling
-myctl.api._dispatch_hook = None
-```
-
-When a plugin developer types `@registry.add_cmd("status")`, the SDK decorator internally fires `_dispatch_hook("status", function_reference)`. This allows the exact memory address of the user's isolated `async def` logic to pass securely backward into the Daemon's core $O(1)$ memory map without destroying the module boundary.
+To ensure that `import myctl.api` always works—even for plugins with no local dependencies—the Discovery Engine automatically injects a `.pth` file into the managed virtual environment's `site-packages` on every boot. This links the daemon's internal `myctl` package to the global Python path, providing a seamless "Zero-Config" developer experience.

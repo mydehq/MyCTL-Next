@@ -1,68 +1,59 @@
 # Server API Reference
 
-This document is the **IPC reference for external client developers** — anyone building a frontend, alternative CLI, or automation tool that communicates with the MyCTL daemon directly over its Unix Socket.
+This document serves as the **IPC reference for external developers**—frontends, automation tools, or alternative CLIs—that communicate with the MyCTL daemon directly over its Unix Socket.
 
-> **Prerequisites**: Familiarise yourself with the [IPC Protocol Specification](../technical/ipc-protocol.md) for the wire format (NDJSON over Unix Socket) before using this reference.
+> [!NOTE]
+> **Prerequisites**: Familiarize yourself with the [IPC Protocol](../technical/ipc-protocol.md) for wire format details (NDJSON over Unix Socket).
 
-The socket is located at `$XDG_RUNTIME_DIR/myctl/myctld.sock`.
+## 📥 Request Pattern
 
-All requests follow this structure:
-
-```json
-{ "path": ["<endpoint>"], "args": [], "cwd": "/", "env": {} }
-```
-
-All responses follow:
+All requests must be sent as single-line JSON objects followed by a newline (`\n`):
 
 ```json
-{ "status": "ok" | "error", "data": <any>, "exit_code": 0 }
+{
+  "path": ["<endpoint>"],
+  "args": ["<arg1>", "<arg2>"],
+  "cwd": "/absolute/path",
+  "env": { "USER": "soymadip" }
+}
 ```
 
-## Health & Discovery
+## 📤 Response Pattern
+
+The daemon responds with a single-line JSON object:
+
+```json
+{
+  "status": "ok" | "error",
+  "data": "Result string or JSON object",
+  "exit_code": 0
+}
+```
+
+---
+
+## 🛠️ Health & Discovery
 
 ### `ping`
 
 A lightweight liveness check.
 
-**Request**
+- **Request**: `{ "path": ["ping"] }`
+- **Response**: `{ "status": "ok", "data": "pong", "exit_code": 0 }`
 
-```json
-{ "path": ["ping"] }
-```
+### `__sys_version`
 
-**Response**
+Returns the daemon's API version.
 
-```json
-{ "status": "ok", "data": "pong", "exit_code": 0 }
-```
+- **Request**: `{ "path": ["__sys_version"] }`
+- **Response**: `{ "status": "ok", "data": "{{metadata.versions.api_ver}}", "exit_code": 0 }`
 
-### `version`
+### `__sys_schema`
 
-Returns the daemon's API version. Use this to verify compatibility before issuing other requests.
+Returns the full command hierarchy as a JSON tree. This is used by the Go client to inflate its Cobra tree dynamically.
 
-**Request**
-
-```json
-{ "path": ["version"] }
-```
-
-**Response**
-
-```json
-{ "status": "ok", "data": "2.0.0", "exit_code": 0 }
-```
-
-### `schema`
-
-Returns the full command tree as a JSON graph. This is the primary endpoint for dynamically building a CLI or UI — it includes all loaded plugins and their subcommands.
-
-**Request**
-
-```json
-{ "path": ["schema"] }
-```
-
-**Response**
+- **Request**: `{ "path": ["__sys_schema"] }`
+- **Response**:
 
 ```json
 {
@@ -70,100 +61,81 @@ Returns the full command tree as a JSON graph. This is the primary endpoint for 
   "data": {
     "audio": {
       "type": "group",
-      "help": "Manage PulseAudio/Pipewire sinks and sources",
+      "help": "Audio controls",
       "children": {
         "volume": {
-          "type": "group",
-          "children": {
-            "set": { "type": "command", "help": "Set volume to a percentage" }
-          }
+          "type": "command",
+          "help": "Set volume"
         }
       }
-    },
-    "ping": { "type": "command", "help": "Health check (returns pong)" }
-  },
-  "exit_code": 0
+    }
+  }
 }
 ```
 
-## Runtime Status
+---
 
-### `status`
+## 📊 Runtime Status
 
-Returns runtime telemetry for the running daemon.
+### `status` (Daemon Status)
 
-**Request**
+Returns telemetry for the running process.
 
-```json
-{ "path": ["status"] }
-```
+- **Request**: `{ "path": ["status"] }`
+- **Response Data**: String containing PID, Uptime, and Version.
 
-**Response**
+### `logs`
 
-```json
-{
-  "status": "ok",
-  "data": "MyCTL Daemon\n  Status:   online\n  Version:  0.2.0\n  PID:      12345\n  Uptime:   142s",
-  "exit_code": 0
-}
-```
+Returns the path to the daemon log file.
 
-## Lifecycle
+- **Request**: `{ "path": ["logs"] }`
+- **Response Data**: `/home/user/.local/state/myctl/daemon.log`
+
+---
+
+## 🔄 Lifecycle Management
 
 ### `stop`
 
-Initiates a graceful shutdown. The daemon unbinds the socket before terminating to prevent stale lock files.
+Initiates a graceful shutdown of the daemon process.
 
-**Request**
-
-```json
-{ "path": ["stop"] }
-```
-
-**Response**
-
-```json
-{ "status": "ok", "data": "Daemon shutting down...", "exit_code": 0 }
-```
+- **Request**: `{ "path": ["stop"] }`
+- **Response**: `Daemon shutting down...`
 
 ### `restart`
 
-Triggers a graceful restart. The daemon exits; the next client connection will trigger a fresh cold boot.
+The daemon terminates gracefully. The next client connection will trigger a fresh cold boot via the Go orchestrator.
 
-**Request**
+- **Request**: `{ "path": ["restart"] }`
+- **Response**: `Daemon restarting...`
 
-```json
-{ "path": ["restart"] }
-```
+---
 
-**Response**
+## 🧩 Executing Plugins
 
-```json
-{ "status": "ok", "data": "Daemon restarting...", "exit_code": 0 }
-```
+Any plugin command can be dispatched by its full path. For example, to call `myctl audio volume set 50`:
 
-## Plugin Commands
-
-Any plugin command can be dispatched by its full path. For example, to call `myctl audio volume set` with argument `50`:
-
-**Request**
+**Request**:
 
 ```json
 {
   "path": ["audio", "volume", "set"],
-  "args": ["myctl", "audio", "volume", "set", "50"],
+  "args": ["50"],
   "cwd": "/home/user",
   "env": { "USER": "soymadip" }
 }
 ```
 
-Use `schema` first to discover available paths dynamically.
+---
 
-## Testing Directly
+## 🔬 Diagnostic Probing
 
-The NDJSON protocol means you can probe the daemon with standard Unix tools, no client library required:
+Because the protocol is plain-text, you can use standard Unix tools to probe the daemon:
 
 ```bash
+# Get health check
 echo '{"path": ["ping"]}' | nc -U $XDG_RUNTIME_DIR/myctl/myctld.sock
-echo '{"path": ["schema"]}' | nc -U $XDG_RUNTIME_DIR/myctl/myctld.sock
+
+# Get full schema
+echo '{"path": ["__sys_schema"]}' | nc -U $XDG_RUNTIME_DIR/myctl/myctld.sock
 ```

@@ -4,51 +4,61 @@ A comprehensive list of built-in commands and their usage. For a complete comman
 
 ## ⚙️ Daemon Management
 
-The `daemon` commands provide control over the persistent MyCTL process.
+The `daemon` commands provide control over the persistent MyCTL process and its managed environment.
 
-| Command | Action | Description |
-| :--- | :--- | :--- |
-| `daemon status` | Status | Returns whether the daemon process is alive. |
-| `daemon stop` | Stop | Gracfully shuts down the Python server. |
-| `daemon version`| Version | Displays the version of the Go proxy and the Daemon. |
-| `daemon ping` | Health | Simple health-check (returns `pong`). |
-| `daemon start` | Start | Forces the daemon to start manually. |
+| Command              | Action  | Description                                                  |
+| :------------------- | :------ | :----------------------------------------------------------- |
+| **`daemon status`**  | Status  | Returns whether the daemon process is alive and operational. |
+| **`daemon stop`**    | Stop    | Gracefully shuts down the Python engine.                     |
+| **`daemon version`** | Version | Displays the version of the Go proxy and the Daemon.         |
+| **`daemon ping`**    | Health  | Simple health-check (returns `pong`).                        |
+| **`daemon start`**   | Start   | Ensures the daemon is running. (Follows logs without `-b`).  |
+| **`daemon logs`**    | Logs    | Tails the daemon log file in the foreground.                 |
+
+### Global Flags
+
+| Flag                   | Usage            | Description                                            |
+| :--------------------- | :--------------- | :----------------------------------------------------- |
+| **`-b, --background`** | `myctl start -b` | Executes the command and exits without following logs. |
 
 ---
 
 ## 🔊 Audio Control
 
-MyCTL integrates with PulseAudio and PipeWire for instant system sound management.
+MyCTL integrates with PulseAudio and Pipewire for instant system sound management.
 
-| Command | Namespace | Description |
-| :--- | :--- | :--- |
-| `audio sink list` | Audio | Lists all available system outputs (speakers, headphones). |
-| `audio sink mute` | Audio | Toggles mute for the current default output. |
-| `audio sink vol up`| Audio | Increments volume for the default sink by 5%. |
-| `audio sink vol down`| Audio | Decrements volume for the default sink by 5%. |
-
----
-
-## 🛠 Developer SDK
-
-The `sdk` namespace is designed to help community developers build extensions quickly.
-
-| Command | Action | Usage |
-| :--- | :--- | :--- |
-| `sdk path` | Path | Returns the path to the internal Python sandbox. |
-| `sdk setup` | Setup | Automatically configures VSCode for plugin development. |
+| Command                      | Namespace | Description                                                |
+| :--------------------------- | :-------- | :--------------------------------------------------------- |
+| **`audio sink list`**        | Audio     | Lists all available system outputs (speakers, headphones). |
+| **`audio sink mute`**        | Audio     | Toggles mute for the current default output.               |
+| **`audio sink volume up`**   | Audio     | Increments volume for the default sink by 5%.              |
+| **`audio sink volume down`** | Audio     | Decrements volume for the default sink by 5%.              |
 
 ---
 
-## 🌍 Extension & Plugins
+## 🛠️ Developer SDK
 
-User-installed plugins appear at the root of the command tree.
+The `sdk` namespace provides tools for building and managing extensions.
 
-| Namespace | Source | Description |
-| :--- | :--- | :--- |
-| `weather` | Plugin | Community-built plugin for meteorological data. |
-| `pkg` | System | (In-development) System package manager wrapper. |
+| Command         | Action | Description                                                  |
+| :-------------- | :----- | :----------------------------------------------------------- |
+| **`sdk path`**  | Path   | Returns the path to the managed **UV virtual environment**.  |
+| **`sdk setup`** | Setup  | Configures your IDE (VSCode/PyCharm) for SDK autocompletion. |
 
-## Why "Wait for completion"?
+---
 
-MyCTL executes all commands asynchronously. If you need to chain commands in a script, the Go client will wait for the daemon's response before exiting, ensuring your script runs in order.
+## 🌍 Extensions & Plugins
+
+User-installed plugins appear at the root of the command tree. These are discovered automatically at startup.
+
+| Namespace     | Tier | Description                                           |
+| :------------ | :--- | :---------------------------------------------------- |
+| **`weather`** | User | Example: Fetches meteorological data via OpenWeather. |
+| **`sysinfo`** | Dev  | Example: Displays hardware resource utilization.      |
+
+## 📜 Scripting & Automation
+
+MyCTL is designed to be a first-class citizen in shell scripts.
+
+- **Synchronous Execution**: The CLI proxy waits for the daemon's response before exiting, ensuring that sequential commands run in the correct order.
+- **Exit Codes**: The daemon passes native exit codes (0 for success, non-zero for errors) back to the proxy, allowing for standard shell error handling (`if myctl stop; then ...`).
