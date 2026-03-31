@@ -6,8 +6,8 @@ MyCTL is designed to be a high-performance system controller that runs with mini
 
 Ensure the following tools are available in your system path:
 
-1.  **[Go 1.22+]({{metadata.tools.go}})**: Used to build and compile the lean CLI Client.
-2.  **[uv]({{metadata.tools.uv}})**: Our primary runtime orchestrator. `uv` manages the Python environment, dependencies, and daemon bootstrapping.
+1.  **<a :href="metadata.tools.go">Go 1.22+</a>**: Used to build and compile the lean CLI Client.
+2.  **<a :href="metadata.tools.uv">uv</a>**: Our primary runtime orchestrator. `uv` manages the Python environment, dependencies, and daemon bootstrapping.
 
 > [!NOTE]
 > **Minimal System Requirement**: You do **not** need a globally installed Python 3 shell to use MyCTL. `uv` will automatically download and manage its own private Python runtime for the daemon.

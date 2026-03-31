@@ -65,4 +65,4 @@ This command initializes the **MyCTL SDK**, ensuring that your IDE (like VS Code
 
 - **[Command Reference](./command-reference.md)**: Full list of all commands.
 - **[Plugin SDK](../dev/plugin-sdk.md)**: Build new MyCTL extensions.
-- **[Technical](../technical/)**: Read how things actually works internally.
+- **[Technical](../technical/overview.md)**: Read how things actually works internally.
