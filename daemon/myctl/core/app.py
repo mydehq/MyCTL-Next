@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import signal
 from typing import Callable
 from .ipc import Request, err
 from .config import SOCKET_PATH, LOG_FILE

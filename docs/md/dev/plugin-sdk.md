@@ -2,16 +2,6 @@
 
 MyCTL is designed to be an extensible platform for desktop automation. By utilizing the **`myctl.api`** Python package, developers can create sophisticated system-native integrations with minimal boilerplate.
 
-## ⭐ The MyCTL SDK Overview
-
-The SDK provides a curated developer experience that bridges the Python daemon with the Client. It features:
-
-- **Zero-Config Injection**: No manual environment setup required for plugins.
-- **IPC Wrapping**: Automatic JSON-IPC request/response management.
-- **Type Hinting**: Full autocompletion support for IDEs.
-- **Lifecycle Hooks**: Professional-grade `@on_load` and `@periodic` hooks.
-
----
 
 ## 🏗 Plugin Structure
 
@@ -19,7 +9,8 @@ Every MyCTL plugin must follow a strict directory-based identity.
 
 ```text
 plugins/
-└── sysinfo/             <-- Plugin ID (must match directory)
+├── plugin1/
+└── plugin2/       <-------- Plugin ID (must match directory)
     ├── pyproject.toml   <-- Manifest (Dependencies & Metadata)
     └── main.py          <-- Logic (Command handlers)
 ```
@@ -65,6 +56,21 @@ MyCTL utilizes **`uv`** to automatically resolve and install plugin dependencies
 
 ## 🛠 Command Registration
 
+### The `Request` Object
+
+Every handler receives a `req` object containing context from the user's terminal:
+
+| Field   | Type             | Description                                           |
+| ------- | ---------------- | ----------------------------------------------------- |
+| `path`  | `list[str]`      | Full command path (e.g. `["sysinfo", "cpu", "load"]`) |
+| `args`  | `list[str]`      | Raw positional arguments (flags are removed)          |
+| `flags` | `dict[str, Any]` | Pre-parsed typed flags (e.g. `{"json": True}`)        |
+| `cwd`   | `str`            | Directory where the user executed the command         |
+| `env`   | `dict[str, str]` | User's environment variables (e.g. `$DISPLAY`)        |
+
+
+### Adding Commands 
+
 Commands are registered using the `registry` proxy from the `myctl.api` package.
 
 ```python
@@ -77,16 +83,37 @@ async def get_cpu_load(req: Request):
     return ok(f"CPU Load: {usage}%")
 ```
 
-### The `Request` Object
+### Declarative Flags
 
-Every handler receives a `req` object containing context from the user's terminal:
+MyCTL provides a powerful pre-parsing engine for flags. By defining flags via `@registry.add_flag`, the engine will automatically parse these values before they reach your handler and expose them to the Go CLI for accurate `--help` generation.
 
-| Field  | Type             | Description                                           |
-| ------ | ---------------- | ----------------------------------------------------- |
-| `path` | `list[str]`      | Full command path (e.g. `["sysinfo", "cpu", "load"]`) |
-| `args` | `list[str]`      | Raw positional arguments from the user                |
-| `cwd`  | `str`            | Directory where the user executed the command         |
-| `env`  | `dict[str, str]` | User's environment variables (e.g. `$DISPLAY`)        |
+```python
+from myctl.api import registry, ok, err, Request
+
+@registry.add_flag("--json", short="-j", type=bool, default=False, help="Return output as a JSON string")
+@registry.add_flag("--interval", short="-i", type=int, default=1, help="Polling interval in seconds")
+@registry.add_flag("--format", type=str, required=True, choices=["text", "json", "yaml"], help="Output format")
+@registry.add_cmd("cpu load", help="Displays current CPU usage")
+async def get_cpu_load(req: Request):
+    # Access pre-parsed flags natively
+    interval = req.flags.get("interval")
+    output_format = req.flags.get("format")
+
+    import psutil
+    usage = psutil.cpu_percent(interval=interval)
+
+    if output_format == "json" or req.flags.get("json"):
+        return ok({"cpu_load": usage, "interval": interval})
+    return ok(f"CPU Load: {usage}% (measured over {interval}s)")
+```
+
+#### Advanced Flag Options
+- **`short`**: Define an alias for the flag (e.g., `short="-j"` allows users to type `-j` instead of `--json`).
+- **`required`**: Set to `True` to force the CLI to reject the command if the flag is missing.
+- **`choices`**: Provide a list of strictly allowed values. The engine will automatically validate user input against this list.
+
+> [!NOTE]
+> **Automatic Parsing**: Any flags parsed by the engine are automatically removed from `req.args`. This means `req.args` will only contain the trailing positional arguments that your command requires (e.g., file paths, resource IDs).
 
 ### Response Helpers: `ok()` and `err()`
 

@@ -16,6 +16,7 @@ class Request(BaseModel):
 
     path: list[str] = Field(default_factory=list, description="The hierarchical command path (e.g., ['audio', 'status'])")
     args: list[str] = Field(default_factory=list, description="Raw arguments passed to the final handler")
+    flags: dict[str, Any] = Field(default_factory=dict, description="Pre-parsed flags and options")
     cwd: str = Field(default=".", description="The current working directory of the user")
     env: dict[str, str] = Field(default_factory=dict, description="Environment variables from the user")
 

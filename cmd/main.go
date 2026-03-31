@@ -37,9 +37,20 @@ type Response struct {
 	ExitCode int         `json:"exit_code"`
 }
 
+type FlagNode struct {
+	Name     string      `json:"name"`
+	Short    string      `json:"short"`
+	Type     string      `json:"type"`
+	Help     string      `json:"help"`
+	Required bool        `json:"required"`
+	Default  interface{} `json:"default"`
+	Choices  []string    `json:"choices"`
+}
+
 type CommandNode struct {
 	Type     string                 `json:"type"`
 	Help     string                 `json:"help"`
+	Flags    []FlagNode             `json:"flags,omitempty"`
 	Children map[string]CommandNode `json:"children,omitempty"`
 }
 
@@ -216,6 +227,43 @@ func buildCobraCommand(name string, node CommandNode, parentPath []string) *cobr
 		},
 	}
 	cmd.FParseErrWhitelist.UnknownFlags = true
+
+	// Register flags purely for --help generation.
+	// Cobra's actual parsing is ignored due to UnknownFlags=true above.
+	for _, flag := range node.Flags {
+		flagName := strings.TrimPrefix(flag.Name, "--")
+		flagName = strings.TrimPrefix(flagName, "-")
+		shortName := strings.TrimPrefix(flag.Short, "-")
+
+		helpText := flag.Help
+		if len(flag.Choices) > 0 {
+			helpText = fmt.Sprintf("%s (choices: %s)", helpText, strings.Join(flag.Choices, ", "))
+		}
+		if flag.Required {
+			helpText = fmt.Sprintf("[REQUIRED] %s", helpText)
+		}
+
+		switch flag.Type {
+		case "bool":
+			defVal, _ := flag.Default.(bool)
+			cmd.Flags().BoolP(flagName, shortName, defVal, helpText)
+		case "int":
+			defVal := 0
+			if v, ok := flag.Default.(float64); ok {
+				defVal = int(v)
+			}
+			cmd.Flags().IntP(flagName, shortName, defVal, helpText)
+		case "float":
+			defVal := 0.0
+			if v, ok := flag.Default.(float64); ok {
+				defVal = v
+			}
+			cmd.Flags().Float64P(flagName, shortName, defVal, helpText)
+		default:
+			defVal, _ := flag.Default.(string)
+			cmd.Flags().StringP(flagName, shortName, defVal, helpText)
+		}
+	}
 
 	for childName, childNode := range node.Children {
 		cmd.AddCommand(buildCobraCommand(childName, childNode, currentPath))

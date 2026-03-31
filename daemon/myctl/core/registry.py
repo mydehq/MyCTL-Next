@@ -60,6 +60,8 @@ class CommandRegistry:
 
         def serialize_node(node: Dict) -> Dict:
             out = {"type": node["type"], "help": node.get("help", "")}
+            if "flags" in node and node["flags"]:
+                out["flags"] = node["flags"]
             if "children" in node:
                 out["children"] = {
                     k: serialize_node(v) for k, v in node["children"].items()
@@ -207,7 +209,7 @@ class CommandRegistry:
         )
         return ok(output)
 
-    def add_cmd(self, plugin_id: str, path: str, handler: Callable, help: str = ""):
+    def add_cmd(self, plugin_id: str, path: str, handler: Callable, help: str = "", flags: list = None):
         """Helper to insert a command into the nested hierarchy."""
         if plugin_id not in self._commands:
             self._commands[plugin_id] = {
@@ -229,6 +231,7 @@ class CommandRegistry:
                         "type": "command",
                         "help": help or handler.__doc__ or "",
                         "handler": handler,
+                        "flags": flags or []
                     }
                 else:
                     current["children"][part] = {
@@ -375,14 +378,23 @@ class CommandRegistry:
                     # SDK BRIDGE: inject hooks into public SDK
                     import myctl.api
 
-                    def _hook(path: str, help: str, func: Callable):
-                        self.add_cmd(plugin_id, path, func, help)
+                    registry_queue = []
+
+                    def _hook(func: Callable):
+                        registry_queue.append(func)
 
                     myctl.api._dispatch_hook = _hook
                     myctl.api.logger = logging.getLogger(f"myctl.plugin.{plugin_id}")
 
                     if spec.loader:
                         spec.loader.exec_module(module)
+
+                        # Process command queue order-agnostically
+                        for func in registry_queue:
+                            cmd_meta = getattr(func, "__myctl_cmd__", {})
+                            flags_meta = getattr(func, "__myctl_flags__", [])
+                            if "path" in cmd_meta:
+                                self.add_cmd(plugin_id, cmd_meta["path"], func, cmd_meta.get("help", ""), flags_meta)
 
                         # Apply root group description from [project].description
                         if plugin_id in self._commands:
@@ -520,6 +532,53 @@ class CommandRegistry:
             if len(req.args) >= len(req.path)
             else req.args[args_start_idx - 1 :]
         )
+
+        # ── Pre-parse Declarative Flags ──────────────────
+        flags_meta = current.get("flags", [])
+        if flags_meta:
+            import argparse
+            class SilentParser(argparse.ArgumentParser):
+                def error(self, message):
+                    raise ValueError(message)
+
+            parser = SilentParser(add_help=False)
+            for fm in flags_meta:
+                kwargs = {
+                    "default": fm["default"],
+                    "help": fm["help"],
+                    "required": fm["required"]
+                }
+                
+                if fm.get("choices"):
+                    kwargs["choices"] = fm["choices"]
+                
+                t = fm.get("type", "str")
+                if t == "bool":
+                    kwargs.pop("type", None)
+                    kwargs.pop("choices", None)
+                    if fm["default"] is True:
+                        kwargs["action"] = "store_false"
+                    else:
+                        kwargs["action"] = "store_true"
+                elif t == "int":
+                    kwargs["type"] = int
+                elif t == "float":
+                    kwargs["type"] = float
+                else:
+                    kwargs["type"] = str
+
+                args_names = [fm["name"]]
+                if fm.get("short"):
+                    args_names.insert(0, fm["short"])
+                
+                parser.add_argument(*args_names, **kwargs)
+            
+            try:
+                parsed, remaining = parser.parse_known_args(req.args)
+                req.flags = vars(parsed)
+                req.args = remaining
+            except ValueError as ve:
+                return err(f"Flag Error: {str(ve)}", exit_code=2)
 
         try:
             result = await handler(req)

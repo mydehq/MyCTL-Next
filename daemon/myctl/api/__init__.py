@@ -5,7 +5,7 @@ from typing import Callable, Any, TypeVar, Optional
 F = TypeVar("F", bound=Callable[..., Any])
 
 # ── Internal hooks — injected by the registry during plugin discovery ─────────
-_dispatch_hook: Optional[Callable[[str, str, Callable], None]] = None
+_dispatch_hook: Optional[Callable[[Callable], None]] = None
 _load_hooks:     list[Callable] = []
 _periodic_hooks: list[tuple[int, Callable]] = []
 
@@ -29,8 +29,26 @@ class RegistryProxy:
     def add_cmd(self, path: str, help: str = "") -> Callable[[F], F]:
         """Register an async function as a CLI command."""
         def decorator(func: F) -> F:
+            func.__myctl_cmd__ = {"path": path, "help": help}
             if _dispatch_hook:
-                _dispatch_hook(path, help, func)
+                _dispatch_hook(func)
+            return func
+        return decorator
+
+    def add_flag(self, name: str, short: str = "", type: type = str, default: Any = None, required: bool = False, choices: list = None, help: str = "") -> Callable[[F], F]:
+        """Register a declarative flag for pre-parsing against a CLI command."""
+        def decorator(func: F) -> F:
+            if not hasattr(func, "__myctl_flags__"):
+                func.__myctl_flags__ = []
+            func.__myctl_flags__.append({
+                "name": name,
+                "short": short,
+                "type": type.__name__ if hasattr(type, "__name__") else "str",
+                "default": default,
+                "required": required,
+                "choices": choices or [],
+                "help": help
+            })
             return func
         return decorator
 
