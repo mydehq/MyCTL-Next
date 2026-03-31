@@ -63,6 +63,8 @@ This command initializes the **MyCTL SDK**, ensuring that your IDE (like VS Code
 
 ## What's Next?
 
-- **[Command Reference](./command-reference.md)**: Full list of built-in commands.
 - **[Plugin SDK](../dev/plugin-sdk.md)**: Build your own system extensions.
 - **[Technical: Bootstrapping](../technical/bootstrapping.md)**: Deep dive into the `uv` orchestration layer.
+- **[Command Reference](/guide/command-reference)**: Explore the full list of available CLI commands.
+- **[Plugin SDK](/dev/plugin-sdk)**: Learn how to build your own system integrations using Python.
+- **[System Architecture](/technical/architecture)**: Understand the "Lean Go / Fat Python" design.
