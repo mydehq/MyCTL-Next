@@ -70,35 +70,3 @@ Furthermore, absolutely everything the daemon touches adheres to strict XDG Base
 | **Sandbox Venv** | `xdg.DataHome`                         | `{{metadata.paths.venv}}`    |
 | **User Plugins** | `xdg.DataHome`                         | `{{metadata.paths.plugins}}` |
 | **Socket IPC**   | `xdg.RuntimeDir` -> `$UID` -> fallback | `{{metadata.paths.socket}}`  |
-
----
-
-## 🔄 Core Operational Flow
-
-The interaction is completely governed by the status of the Unix Socket.
-
-```mermaid
-sequenceDiagram
-    participant CLI as Client
-    participant UV as UV Orchestrator
-    participant Socket as Unix Socket
-    participant Engine as Python Engine
-
-    Note over CLI: User executes `myctl <command>`
-
-    CLI->>Socket: Dial("unix", path)
-    alt Socket Found (Warm Boot)
-        CLI->>Socket: NDJSON Request Payload
-        Socket-->>Engine: StreamReader.readline()
-        Engine->>Engine: N-Level Route Dispatch
-        Engine-->>Socket: NDJSON Response
-        Socket-->>CLI: Parse JSON & os.Exit(ExitCode)
-    else Socket Missing (Cold Boot)
-        Note over CLI, UV: Handshake Sequence
-        CLI->>UV: uv run --project <daemon_root>
-        UV->>Engine: Launch managed python
-        Engine->>Engine: Discover plugins & Inject SDK
-        Engine-->>CLI: "__DAEMON_READY__" Token
-        Note right of CLI: (Handshake complete. Proxy resumes.)
-    end
-```

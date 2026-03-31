@@ -14,6 +14,7 @@ export default withMermaid({
   description: metadata.description,
 
   transformPageData(pageData) {
+    pageData.frontmatter.metadata = metadata;
     if (pageData.relativePath === "index.md") {
       pageData.frontmatter.hero.name = metadata.title;
       pageData.frontmatter.hero.text = metadata.description;
@@ -23,6 +24,13 @@ export default withMermaid({
 
   themeConfig: {
     logo: "/icon.svg",
+
+    search: {
+      provider: "local",
+      options: {
+        miniSearch: {},
+      },
+    },
 
     nav: [
       { text: "Getting Started", link: "/guide/getting-started" },

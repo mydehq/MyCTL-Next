@@ -12,7 +12,6 @@ MyCTL operates on a **Lean Client / Fat Server** architecture.
 > [!NOTE]
 > **Orchestration**: The Client uses `uv` to automatically bootstrap the daemon. You don't need to manually start the server before using MyCTL.
 
----
 
 ## 🚀 The First Run
 
@@ -30,11 +29,10 @@ If this is your first time running MyCTL:
 
 **Output:** `pong`
 
----
 
 ## 🔊 Exploring Built-ins
 
-MyCTL includes several native system integrations. Try the audio namespace:
+MyCTL includes several native system integrations. Try the audio plugin:
 
 ```bash
 # List all system audio outputs
@@ -47,22 +45,9 @@ myctl audio sink mute
 myctl daemon status
 ```
 
----
-
-## 🛠 Developer Ecosystem
-
-If you're a developer, you can quickly configure your environment for building plugins:
-
-```bash
-myctl sdk setup
-```
-
-This command initializes the **MyCTL SDK**, ensuring that your IDE (like VS Code) has full autocompletion support for the `myctl.api` package.
-
----
 
 ## What's Next?
 
-- **[Command Reference](./command-reference.md)**: Full list of all commands.
+- **[Command Reference](./command-reference.md)**: Full list of all builtin commands.
 - **[Plugin SDK](../dev/plugin-sdk.md)**: Build new MyCTL extensions.
 - **[Technical](../technical/overview.md)**: Read how things actually works internally.

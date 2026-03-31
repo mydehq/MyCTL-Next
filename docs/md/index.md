@@ -15,16 +15,27 @@ hero:
       link: /guide/getting-started
 
     - theme: alt
-      text: "Architecture Guide"
-      link: /technical/architecture
+      text: "Plugin SDK"
+      link: /dev/plugin-sdk
 
 features:
-  - title: "⚡️ Sub-ms Proxy"
-    details: "Universal UV Orchestration ensures sub-millisecond execution times and zero-dependency system portability."
-  - title: "🍱 Managed Runtime"
-    details: "The Python engine is strictly sandboxed. UV automatically manages Python versions and tiered dependencies on every boot."
-  - title: "🧩 Recursive N-Level Commands"
-    details: "Our dynamic Cobra rehydration supports infinite-depth hierarchical commands like 'audio sink volume set' natively."
-  - title: "🛠️ SDK-First Extensions"
-    details: "The 'myctl.api' package provides a Zero-Config developer experience with full IDE type-hinting and autocompletion."
+  - icon: "🌍"
+    title: "Environment Agnostic"
+    details: "Runs anywhere. MyCTL works seamlessly across all DEs/WMs"
+    link: /guide/install
+
+  - icon: "⚡️"
+    title: "Instant Performance"
+    details: "Built with client-server architecture, little to no latency."
+    link: /guide/getting-started#architecture-the-lean-proxy
+
+  - icon: "🧩"
+    title: "Extend with Plugins"
+    details: "Add various functionalities beyond builtins with Rich plugin system"
+    link: /dev/plugin-sdk
+
+  - icon: "🍱"
+    title: "No Dependency Hell"
+    details: "Almost Zero system package deps. A fully sandboxed runtime keeps host system clean."
+    link: /technical/bootstrapping
 ---
