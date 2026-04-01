@@ -1,7 +1,14 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}/daemon/.venv/bin/python",
+    "files.autoSave": "afterDelay",
+    "editor.formatOnSave": true,
+    "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font Mono",
+    "python.defaultInterpreterPath": "./daemon/.venv/bin/python",
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/daemon"
+        "./daemon"
     ],
-    "files.autoSave": "afterDelay"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnPaste": true,
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    }
 }

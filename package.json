@@ -1,7 +1,0 @@
-{
-  "dependencies": {},
-  "devDependencies": {
-    "flexsearch": "^0.8.212",
-    "vitepress-plugin-search": "^1.0.4-alpha.22"
-  }
-}

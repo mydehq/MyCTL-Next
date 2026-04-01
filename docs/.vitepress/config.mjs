@@ -1,11 +1,17 @@
 import { withMermaid } from "vitepress-plugin-mermaid";
 import { metadata } from "../vars.js";
+import { metadataPlugin } from "./plugins/metadata.js";
 
 export default withMermaid({
   srcDir: "md",
   cleanUrls: true,
   vite: {
     publicDir: "../public",
+  },
+  markdown: {
+    config: (md) => {
+      md.use(metadataPlugin);
+    },
   },
 
   head: [["link", { rel: "icon", type: "image/svg+xml", href: "/icon.svg" }]],
@@ -24,6 +30,7 @@ export default withMermaid({
 
   themeConfig: {
     logo: "/icon.svg",
+    outline: [2, 3],
 
     search: {
       provider: "local",
@@ -51,15 +58,28 @@ export default withMermaid({
       {
         text: "Developer Guide",
         items: [
-          { text: "Developing Plugins", link: "/dev/plugin-sdk" },
+          {
+            text: "Plugin Development",
+            collapsed: true,
+            items: [
+              { text: "Introduction", link: "/dev/plugin-sdk/" },
+              { text: "Quick Start", link: "/dev/plugin-sdk/quick-start" },
+              { text: "Manifest Reference", link: "/dev/plugin-sdk/manifest" },
+              { text: "Commands & Flags", link: "/dev/plugin-sdk/commands" },
+              { text: "Lifecycle & Tasks", link: "/dev/plugin-sdk/lifecycle" },
+              { text: "API Reference", link: "/dev/plugin-sdk/api" },
+            ],
+          },
           { text: "Server API (IPC)", link: "/dev/server-api" },
         ],
       },
       {
         text: "Technical Reference",
+        collapsed: true,
         items: [
           { text: "Overview", link: "/technical/overview" },
           { text: "System Architecture", link: "/technical/architecture" },
+          { text: "Performance Benchmarks", link: "/technical/benchmarks" },
           { text: "Bootstrapping", link: "/technical/bootstrapping" },
           { text: "IPC Protocol", link: "/technical/ipc-protocol" },
           { text: "Core Engine & Registry", link: "/technical/registry" },
