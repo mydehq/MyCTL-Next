@@ -1,0 +1,10 @@
+[project]
+name = "plugin"
+authors = [{ name = "soymadip" }]
+version = "0.1.0"
+description = "MyCTL Official Plugin Manager"
+dependencies = []
+
+[tool.myctl]
+api_version = "2.0.0"
+entry = "main.py"

@@ -1,0 +1,1 @@
+"""Plugin scaffolding implementation package."""

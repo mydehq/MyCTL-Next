@@ -2,22 +2,25 @@ import asyncio
 import json
 import logging
 from typing import Callable
-from .ipc import Request, err
+from .ipc import Context, err
 from .config import SOCKET_PATH, LOG_FILE
 
 # Setup basic logging
 logging.basicConfig(
     filename=str(LOG_FILE),
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
+    format="%(asctime)s [%(levelname)s] %(message)s",
 )
+
 
 class DaemonServer:
     def __init__(self, registry):
         self.registry = registry
         self.server = None
 
-    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
         """Standard NDJSON IPC Handler"""
         try:
             line = await reader.readline()
@@ -25,17 +28,37 @@ class DaemonServer:
                 return
 
             raw_data = json.loads(line.decode().strip())
-            req = Request(**raw_data)
+            ctx = Context(**raw_data)
 
-            response_data = await self.registry.dispatch(req)
+            async def ask_cb(prompt: str, secret: bool = False) -> str:
+                msg = {
+                    "status": 2,
+                    "data": {"prompt": prompt, "secret": bool(secret)},
+                    "exit_code": 0,
+                }
+                writer.write(json.dumps(msg).encode() + b"\n")
+                await writer.drain()
+                answer_line = await reader.readline()
+                if not answer_line:
+                    raise EOFError("Client disconnected during prompt")
 
-            writer.write(json.dumps(response_data).encode() + b"\n")
+                try:
+                    answer_data = json.loads(answer_line.decode().strip())
+                    return str(answer_data.get("data", ""))
+                except json.JSONDecodeError:
+                    return answer_line.decode().strip()
+
+            ctx._ask_callback = ask_cb
+
+            response_data = await self.registry.dispatch(ctx)
+
+            writer.write(response_data.model_dump_json().encode() + b"\n")
             await writer.drain()
 
         except Exception as e:
             logging.error(f"Internal Engine Error: {str(e)}")
             error_response = err(f"Internal Engine Error: {str(e)}")
-            writer.write(json.dumps(error_response).encode() + b"\n")
+            writer.write(error_response.model_dump_json().encode() + b"\n")
             await writer.drain()
         finally:
             writer.close()
@@ -59,7 +82,9 @@ class DaemonServer:
 
         # ── Start Periodic Background Tasks ──────────────
         for interval, func in self.registry.periodic_tasks:
-            logging.info(f"Starting background task: {func.__name__} (every {interval}s)")
+            logging.info(
+                f"Starting background task: {func.__name__} (every {interval}s)"
+            )
             asyncio.create_task(self._periodic_wrapper(interval, func))
 
         # The "Ready Signal" for the Go Proxy

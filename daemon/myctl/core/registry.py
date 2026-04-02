@@ -3,10 +3,14 @@ import subprocess
 import tomllib
 import importlib.util
 import logging
+import inspect
+from pathlib import Path
+from types import ModuleType
 from typing import Callable, Any, Dict, List, Tuple
 
-from .ipc import Request, err, ok
+from .ipc import Context, Response, err, ok
 from .config import PLUGIN_SEARCH_PATHS, API_VERSION, VENV_PYTHON, DAEMON_DIR
+from myctl.api.logger import bind_logger_plugin, reset_logger_plugin
 
 
 class CommandRegistry:
@@ -55,7 +59,7 @@ class CommandRegistry:
 
     # ── System Handlers ──────────────────────────────────────────────────────
 
-    async def _sys_schema(self, req: Request) -> Dict[str, Any]:
+    async def _sys_schema(self, ctx: Context) -> Dict[str, Any]:
         """Provides the entire command hierarchy for the Go cli."""
 
         def serialize_node(node: Dict) -> Dict:
@@ -94,7 +98,7 @@ class CommandRegistry:
 
         return ok(schema)
 
-    async def _sys_sdk(self, req: Request) -> Dict[str, Any]:
+    async def _sys_sdk(self, ctx: Context) -> Dict[str, Any]:
         """Provides IDE configuration help and ensures SDK injection."""
         # 1. Ensure .pth is injected for SDK availability
         site_packages = (
@@ -115,7 +119,7 @@ class CommandRegistry:
             }
         )
 
-    async def _sys_start(self, req: Request) -> Dict[str, Any]:
+    async def _sys_start(self, ctx: Context) -> Dict[str, Any]:
         import time
         import sys
 
@@ -132,7 +136,7 @@ class CommandRegistry:
             return ok("Daemon started successfully.")
         return ok("Daemon is already running and operational.")
 
-    async def _sys_restart(self, req: Request) -> Dict[str, Any]:
+    async def _sys_restart(self, ctx: Context) -> Dict[str, Any]:
         import asyncio
         import sys
 
@@ -140,15 +144,15 @@ class CommandRegistry:
         loop.call_later(0.1, sys.exit, 0)
         return ok("Daemon restarting...")
 
-    async def _sys_ping(self, req: Request) -> Dict[str, Any]:
+    async def _sys_ping(self, ctx: Context) -> Dict[str, Any]:
         return ok("pong")
 
-    async def _sys_version(self, req: Request) -> Dict[str, Any]:
+    async def _sys_version(self, ctx: Context) -> Dict[str, Any]:
         from .config import APP_VERSION
 
         return ok(APP_VERSION)
 
-    async def _sys_stop(self, req: Request) -> Dict[str, Any]:
+    async def _sys_stop(self, ctx: Context) -> Dict[str, Any]:
         import asyncio
         import sys
 
@@ -156,7 +160,7 @@ class CommandRegistry:
         loop.call_later(0.1, sys.exit, 0)
         return ok("Daemon shutting down...")
 
-    async def _sys_help(self, req: Request) -> Dict[str, Any]:
+    async def _sys_help(self, ctx: Context) -> Dict[str, Any]:
         help_text = [
             "MyCTL - Desktop Controller",
             "Usage: myctl <plugin> <command> [args]",
@@ -168,7 +172,7 @@ class CommandRegistry:
             help_text.append(f"  - {p_id}: {self._commands[p_id].get('help', '')}")
         return ok("\n".join(help_text))
 
-    async def _sys_logs(self, req: Request) -> Dict[str, Any]:
+    async def _sys_logs(self, ctx: Context) -> Dict[str, Any]:
         """Returns the tail end of the daemon logs."""
         from .config import LOG_FILE
 
@@ -184,7 +188,7 @@ class CommandRegistry:
         except Exception as e:
             return err(f"Failed to read logs: {e}")
 
-    async def _sys_status(self, req: Request) -> Dict[str, Any]:
+    async def _sys_status(self, ctx: Context) -> Dict[str, Any]:
         import time
         import os
         from .config import APP_VERSION
@@ -209,7 +213,14 @@ class CommandRegistry:
         )
         return ok(output)
 
-    def add_cmd(self, plugin_id: str, path: str, handler: Callable, help: str = "", flags: list = None):
+    def add_cmd(
+        self,
+        plugin_id: str,
+        path: str,
+        handler: Callable,
+        help: str = "",
+        flags: list = None,
+    ):
         """Helper to insert a command into the nested hierarchy."""
         if plugin_id not in self._commands:
             self._commands[plugin_id] = {
@@ -231,7 +242,7 @@ class CommandRegistry:
                         "type": "command",
                         "help": help or handler.__doc__ or "",
                         "handler": handler,
-                        "flags": flags or []
+                        "flags": flags or [],
                     }
                 else:
                     current["children"][part] = {
@@ -241,6 +252,21 @@ class CommandRegistry:
                     }
 
             current = current["children"][part]
+
+    def _ensure_package(self, name: str, package_path: Path):
+        """Ensure a namespace/package module exists in sys.modules."""
+        if name in sys.modules:
+            pkg = sys.modules[name]
+            if not hasattr(pkg, "__path__"):
+                pkg.__path__ = []
+            if str(package_path) not in pkg.__path__:
+                pkg.__path__.append(str(package_path))
+            return
+
+        pkg = ModuleType(name)
+        pkg.__path__ = [str(package_path)]
+        pkg.__package__ = name
+        sys.modules[name] = pkg
 
     async def discover(self):
         """Tiers: DEV -> USER -> SYSTEM (Highest Priority wins entirely)"""
@@ -368,67 +394,117 @@ class CommandRegistry:
                                 "Skipping dependency installation."
                             )
 
-                    # 3. Dynamic Import (Sandboxed)
-                    # We inject the 'registry' helper into the plugin module
+                    # 3. Dynamic Import via package-context namespace
+                    # Load each plugin under `myctl_plugins.<plugin_id>.*` to make
+                    # relative imports deterministic and collision-free.
+                    namespace_root = "myctl_plugins"
+                    plugin_pkg = f"{namespace_root}.{plugin_id}"
+                    entry_stem = entry_path.stem
+                    entry_mod_name = f"{plugin_pkg}.{entry_stem}"
+
+                    self._ensure_package(namespace_root, plugin_dir.parent)
+                    self._ensure_package(plugin_pkg, plugin_dir)
+
                     spec = importlib.util.spec_from_file_location(
-                        plugin_id, str(entry_path)
+                        entry_mod_name,
+                        str(entry_path),
                     )
+                    if not spec or not spec.loader:
+                        logging.error(
+                            f"Plugin '{plugin_id}': Failed to create module spec."
+                        )
+                        continue
+
                     module = importlib.util.module_from_spec(spec)
+                    sys.modules[entry_mod_name] = module
 
-                    # SDK BRIDGE: inject hooks into public SDK
-                    import myctl.api
-
-                    registry_queue = []
-
-                    def _hook(func: Callable):
-                        registry_queue.append(func)
-
-                    myctl.api._dispatch_hook = _hook
-                    myctl.api.logger = logging.getLogger(f"myctl.plugin.{plugin_id}")
-
-                    if spec.loader:
+                    # Execute the module
+                    try:
                         spec.loader.exec_module(module)
+                    except Exception as e:
+                        logging.error(
+                            f"Plugin '{plugin_id}': Failed to execute module: {e}"
+                        )
+                        continue
 
-                        # Process command queue order-agnostically
-                        for func in registry_queue:
-                            cmd_meta = getattr(func, "__myctl_cmd__", {})
-                            flags_meta = getattr(func, "__myctl_flags__", [])
+                    # 4. Extract Plugin instance and register commands
+                    plugin_instance = None
+                    for attr_name in dir(module):
+                        attr = getattr(module, attr_name)
+                        # Check if it's a Plugin instance with matching name
+                        if (
+                            hasattr(attr, "__class__")
+                            and attr.__class__.__name__ == "Plugin"
+                            and hasattr(attr, "name")
+                            and attr.name == plugin_id
+                        ):
+                            plugin_instance = attr
+                            break
+
+                    if not plugin_instance:
+                        logging.warning(
+                            f"Plugin '{plugin_id}': No Plugin instance found with name '{plugin_id}'"
+                        )
+                        continue
+
+                    # 5. Register commands from plugin._commands
+                    if hasattr(plugin_instance, "_commands"):
+                        for handler in plugin_instance._commands:
+                            cmd_meta = getattr(handler, "__myctl_cmd__", {})
+                            flags_meta = getattr(handler, "__myctl_flags__", [])
                             if "path" in cmd_meta:
-                                self.add_cmd(plugin_id, cmd_meta["path"], func, cmd_meta.get("help", ""), flags_meta)
+                                self.add_cmd(
+                                    plugin_id,
+                                    cmd_meta["path"],
+                                    handler,
+                                    cmd_meta.get("help", ""),
+                                    flags_meta,
+                                )
 
-                        # Apply root group description from [project].description
-                        if plugin_id in self._commands:
-                            self._commands[plugin_id]["help"] = (
-                                manifest["info"] or f"Plugin '{plugin_id}'"
-                            )
+                    # Apply root group description from [project].description
+                    if plugin_id in self._commands:
+                        self._commands[plugin_id]["help"] = (
+                            manifest["info"] or f"Plugin '{plugin_id}'"
+                        )
 
-                        # Apply sub-group descriptions from [tool.myctl.groups]
-                        for group_path, group_help in manifest["groups"].items():
-                            if not group_path or plugin_id not in self._commands:
-                                continue
-                            parts = group_path.strip().split()
-                            current = self._commands[plugin_id]
-                            for part in parts:
-                                children = current.setdefault("children", {})
-                                if part not in children:
-                                    children[part] = {
-                                        "type": "group",
-                                        "help": "",
-                                        "children": {},
-                                    }
-                                current = children[part]
-                            current["help"] = group_help
+                    # Apply sub-group descriptions from [tool.myctl.groups]
+                    for group_path, group_help in manifest["groups"].items():
+                        if not group_path or plugin_id not in self._commands:
+                            continue
+                        parts = group_path.strip().split()
+                        current = self._commands[plugin_id]
+                        for part in parts:
+                            children = current.setdefault("children", {})
+                            if part not in children:
+                                children[part] = {
+                                    "type": "group",
+                                    "help": "",
+                                    "children": {},
+                                }
+                            current = children[part]
+                        current["help"] = group_help
 
-                        # 4. Run on_load lifecycle hooks
-                        import asyncio
+                    # 6. Run on_load lifecycle hooks
+                    import asyncio
 
-                        plugin_failed = False
-                        for hook in myctl.api._load_hooks:
+                    plugin_failed = False
+                    if hasattr(plugin_instance, "_load_hooks"):
+                        for hook in plugin_instance._load_hooks:
                             try:
-                                if asyncio.iscoroutinefunction(hook):
-                                    await hook()
-                                else:
-                                    hook()
+                                hook_ctx = Context(
+                                    path=[plugin_id], plugin_id=plugin_id
+                                )
+                                token = bind_logger_plugin(plugin_id)
+                                try:
+                                    takes_ctx = (
+                                        len(inspect.signature(hook).parameters) > 0
+                                    )
+                                    if asyncio.iscoroutinefunction(hook):
+                                        await (hook(hook_ctx) if takes_ctx else hook())
+                                    else:
+                                        hook(hook_ctx) if takes_ctx else hook()
+                                finally:
+                                    reset_logger_plugin(token)
                             except Exception as e:
                                 logging.error(
                                     f"Plugin '{plugin_id}' critical initialization failure: {e}"
@@ -436,73 +512,99 @@ class CommandRegistry:
                                 plugin_failed = True
                                 break
 
-                        if plugin_failed:
-                            logging.critical(
-                                f"REJECTED plugin '{plugin_id}': Failed initialization. Rolling back."
-                            )
-                            # Roll back registrations
-                            if plugin_id in self._commands:
-                                del self._commands[plugin_id]
-                            if plugin_id in self._plugins:
-                                del self._plugins[plugin_id]
-                        else:
-                            # 5. Process Background Tasks
-                            # Only register periodic hooks if initialization succeeded
-                            self.periodic_tasks.extend(myctl.api._periodic_hooks)
+                    if plugin_failed:
+                        logging.critical(
+                            f"REJECTED plugin '{plugin_id}': Failed initialization. Rolling back."
+                        )
+                        # Roll back registrations
+                        if plugin_id in self._commands:
+                            del self._commands[plugin_id]
+                        if plugin_id in self._plugins:
+                            del self._plugins[plugin_id]
+                    else:
+                        # 7. Process Background Tasks
+                        if hasattr(plugin_instance, "_periodic_hooks"):
+                            for interval, hook in plugin_instance._periodic_hooks:
+                                hook_takes_ctx = (
+                                    len(inspect.signature(hook).parameters) > 0
+                                )
 
-                            logging.info(
-                                f"Loaded plugin '{plugin_id}' (v{manifest.get('version', 'unknown')})"
-                            )
+                                if inspect.iscoroutinefunction(hook):
 
-                    # Clear all hooks after module execution to prevent pollution
-                    myctl.api._dispatch_hook = None
-                    myctl.api._load_hooks.clear()
-                    myctl.api._periodic_hooks.clear()
-                    myctl.api.logger = logging.getLogger("myctl.plugin")
+                                    async def wrapped_async(
+                                        fn=hook,
+                                        pid=plugin_id,
+                                        with_ctx=hook_takes_ctx,
+                                    ):
+                                        token = bind_logger_plugin(pid)
+                                        try:
+                                            if with_ctx:
+                                                await fn(
+                                                    Context(path=[pid], plugin_id=pid)
+                                                )
+                                            else:
+                                                await fn()
+                                        finally:
+                                            reset_logger_plugin(token)
 
-                    if not plugin_failed:
-                        # Mark this plugin as actively loaded to prevent lower tiers from merging
+                                    self.periodic_tasks.append(
+                                        (interval, wrapped_async)
+                                    )
+                                else:
+
+                                    def wrapped_sync(
+                                        fn=hook,
+                                        pid=plugin_id,
+                                        with_ctx=hook_takes_ctx,
+                                    ):
+                                        token = bind_logger_plugin(pid)
+                                        try:
+                                            if with_ctx:
+                                                fn(Context(path=[pid], plugin_id=pid))
+                                            else:
+                                                fn()
+                                        finally:
+                                            reset_logger_plugin(token)
+
+                                    self.periodic_tasks.append((interval, wrapped_sync))
+
+                        logging.info(
+                            f"Loaded plugin '{plugin_id}' (v{manifest.get('version', 'unknown')})"
+                        )
                         loaded_plugins.add(plugin_id)
 
                 except Exception as e:
                     logging.error(f"Error loading plugin '{plugin_id}': {e}")
                     continue
 
-    async def dispatch(self, req: Request) -> Dict[str, Any]:
+    async def dispatch(self, ctx: Context) -> Response:
         """Resolve System Handler or dispatch to Plugin"""
-        if not req.path:
-            return await self._sys_help(req)
+        if not ctx.path:
+            return await self._sys_help(ctx)
 
         # ── 1. Check Native System Handlers ──────────────
-        root_cmd = req.path[0]
+        root_cmd = ctx.path[0]
 
         # Handle 'daemon <action>' syntax gracefully mapping to system handlers
-        if root_cmd == "daemon" and len(req.path) >= 2:
-            action = req.path[1]
+        if root_cmd == "daemon" and len(ctx.path) >= 2:
+            action = ctx.path[1]
             if action in ("stop", "status"):
                 root_cmd = action
             elif action == "start":
-                return await self._sys_start(req)
+                return await self._sys_start(ctx)
             elif action == "logs":
-                return await self._sys_logs(req)
+                return await self._sys_logs(ctx)
             elif action == "restart":
-                import asyncio
-                import sys
-
-                loop = asyncio.get_running_loop()
-                loop.call_later(0.1, sys.exit, 0)
-                return ok(
-                    "Daemon restarting... (Next command will trigger fresh bootstrap)"
-                )
+                return await self._sys_restart(ctx)
 
         if root_cmd in self._system_handlers:
             try:
-                return await self._system_handlers[root_cmd](req)
+                return await self._system_handlers[root_cmd](ctx)
             except Exception as e:
                 return err(f"System Handler Error: {str(e)}")
 
         # ── 2. Standard Plugin Dispatch ──────────────────
-        plugin_id = req.path[0]
+        plugin_id = ctx.path[0]
         args_start_idx = 1
 
         if plugin_id not in self._commands:
@@ -511,8 +613,8 @@ class CommandRegistry:
         current = self._commands[plugin_id]
 
         # Traverse the tree based on the provided path
-        for i in range(1, len(req.path)):
-            part = req.path[i]
+        for i in range(1, len(ctx.path)):
+            part = ctx.path[i]
             if "children" in current and part in current["children"]:
                 current = current["children"][part]
                 args_start_idx = i + 1
@@ -526,17 +628,18 @@ class CommandRegistry:
         if not handler:
             return err("No handler defined for this command path.")
 
-        # Prune the handled path parts out of req.args
-        req.args = (
-            req.args[len(req.path) :]
-            if len(req.args) >= len(req.path)
-            else req.args[args_start_idx - 1 :]
+        # Prune the handled path parts out of ctx.args
+        ctx.args = (
+            ctx.args[len(ctx.path) :]
+            if len(ctx.args) >= len(ctx.path)
+            else ctx.args[args_start_idx - 1 :]
         )
 
         # ── Pre-parse Declarative Flags ──────────────────
         flags_meta = current.get("flags", [])
         if flags_meta:
             import argparse
+
             class SilentParser(argparse.ArgumentParser):
                 def error(self, message):
                     raise ValueError(message)
@@ -546,12 +649,12 @@ class CommandRegistry:
                 kwargs = {
                     "default": fm["default"],
                     "help": fm["help"],
-                    "required": fm["required"]
+                    "required": fm["required"],
                 }
-                
+
                 if fm.get("choices"):
                     kwargs["choices"] = fm["choices"]
-                
+
                 t = fm.get("type", "str")
                 if t == "bool":
                     kwargs.pop("type", None)
@@ -570,21 +673,28 @@ class CommandRegistry:
                 args_names = [fm["name"]]
                 if fm.get("short"):
                     args_names.insert(0, fm["short"])
-                
+
                 parser.add_argument(*args_names, **kwargs)
-            
+
             try:
-                parsed, remaining = parser.parse_known_args(req.args)
-                req.flags = vars(parsed)
-                req.args = remaining
+                parsed, remaining = parser.parse_known_args(ctx.args)
+                ctx.flags = vars(parsed)
+                ctx.args = remaining
             except ValueError as ve:
                 return err(f"Flag Error: {str(ve)}", exit_code=2)
 
+        # ── Inject plugin_id into Context and dispatch ──────────────────
+        ctx.plugin_id = plugin_id
+
         try:
-            result = await handler(req)
-            if not isinstance(result, dict) or "status" not in result:
+            token = bind_logger_plugin(plugin_id)
+            try:
+                result = await handler(ctx)
+            finally:
+                reset_logger_plugin(token)
+            if not isinstance(result, Response):
                 logging.warning(
-                    f"Plugin '{plugin_id}' handler at '{req.path}' returned invalid object: {type(result)}"
+                    f"Plugin '{plugin_id}' handler at '{ctx.path}' returned invalid object: {type(result)}"
                 )
                 return err(
                     "Internal Error: Handler did not return a valid response object.\n"

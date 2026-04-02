@@ -1,6 +1,6 @@
 /*
 MyCTL Lean Client Proxy (V2.5 - UV-Native)
-Sub-millisecond CLI router that dynamically retrieves its command tree 
+Sub-millisecond CLI router that dynamically retrieves its command tree
 from a persistent Python daemon.
 */
 package main
@@ -14,12 +14,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -32,10 +34,17 @@ type Request struct {
 }
 
 type Response struct {
-	Status   string      `json:"status"`
+	Status   int         `json:"status"`
 	Data     interface{} `json:"data"`
 	ExitCode int         `json:"exit_code"`
 }
+
+const (
+	StatusOk    = 0
+	StatusError = 1
+	StatusAsk   = 2
+)
+
 
 type FlagNode struct {
 	Name     string      `json:"name"`
@@ -128,16 +137,70 @@ func sendIPCRequest(req Request, allowBootstrap bool) (*Response, error) {
 		return nil, err
 	}
 
-	respLine, err := bufio.NewReader(conn).ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
+	reader := bufio.NewReader(conn)
+	for {
+		respLine, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
 
-	var resp Response
-	if err = json.Unmarshal([]byte(respLine), &resp); err != nil {
-		return nil, err
+		var resp Response
+		if err = json.Unmarshal([]byte(respLine), &resp); err != nil {
+			return nil, err
+		}
+
+		if resp.Status == StatusAsk {
+			prompt := ""
+			secret := false
+
+			switch v := resp.Data.(type) {
+			case string:
+				prompt = v
+			case map[string]interface{}:
+				if p, ok := v["prompt"].(string); ok {
+					prompt = p
+				}
+				if s, ok := v["secret"].(bool); ok {
+					secret = s
+				}
+			default:
+				prompt = fmt.Sprintf("%v", resp.Data)
+			}
+
+			if prompt != "" {
+				fmt.Print(prompt)
+			}
+
+			answer := ""
+			if secret && term.IsTerminal(int(syscall.Stdin)) {
+				pw, readErr := term.ReadPassword(int(syscall.Stdin))
+				fmt.Println()
+				if readErr != nil {
+					return nil, readErr
+				}
+				answer = string(pw)
+			} else {
+				scanner := bufio.NewScanner(os.Stdin)
+				scanner.Scan()
+				if scanErr := scanner.Err(); scanErr != nil {
+					return nil, scanErr
+				}
+				answer = scanner.Text()
+			}
+
+			// Send the data back over the socket
+			answerPayload := map[string]string{"data": answer}
+			answerBytes, _ := json.Marshal(answerPayload)
+			answerBytes = append(answerBytes, '\n')
+			
+			if _, err = conn.Write(answerBytes); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		return &resp, nil
 	}
-	return &resp, nil
 }
 
 // ── Schema Layer ─────────────────────────────────────────────────────────────
@@ -149,7 +212,7 @@ func fetchSchema(allowBootstrap bool) (map[string]CommandNode, error) {
 		return nil, err
 	}
 
-	if resp.Status != "ok" {
+	if resp.Status != StatusOk {
 		return nil, fmt.Errorf("schema error: %v", resp.Data)
 	}
 
@@ -187,7 +250,7 @@ func executeDaemonCommand(path []string, _ []string) {
 		log.Fatal().Err(err).Msg("IPC communication failed")
 	}
 
-	if resp.Status != "ok" {
+	if resp.Status != StatusOk {
 		fmt.Fprintf(os.Stderr, "\x1b[31mError:\x1b[0m %v\n", resp.Data)
 	} else {
 		switch v := resp.Data.(type) {
@@ -202,6 +265,16 @@ func executeDaemonCommand(path []string, _ []string) {
 	// Foreground log handling for start/logs
 	if len(path) > 0 {
 		name := path[len(path)-1]
+		if name == "restart" && resp.Status == StatusOk {
+			// Give the daemon a moment to exit, then force a warm-ready state
+			// so `myctl daemon restart` behaves as an actual restart, not stop-only.
+			time.Sleep(300 * time.Millisecond)
+			if _, bootErr := sendIPCRequest(Request{Path: []string{"ping"}}, true); bootErr != nil {
+				log.Error().Err(bootErr).Msg("Daemon restart bootstrap failed")
+				os.Exit(1)
+			}
+		}
+
 		if (name == "start" || name == "logs") && !background {
 			log.Info().Msg("Following logs (CTRL-C to detach)...")
 			tailLogs()
