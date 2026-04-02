@@ -83,7 +83,7 @@ export default withMermaid({
             text: "Core Runtime",
             collapsed: true,
             items: [
-              { text: "System Architecture", link: "/technical/architecture" },
+              { text: "System Architecture", link: "/technical/core-runtime/architecture" },
               { text: "Bootstrapping", link: "/technical/core-runtime/bootstrapping" },
               { text: "IPC Protocol", link: "/technical/core-runtime/ipc-protocol" },
               { text: "Core Engine & Registry", link: "/technical/core-runtime/registry" },

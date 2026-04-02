@@ -564,7 +564,7 @@ The daemon adapts ANSI styling based on the explicit `terminal` block in the req
 - `strip_ansi(text)` removes all codes for JSON/machine output
 - Gracefully degrades to plain text if terminal lacks support
 
-**Full protocol details:** see [IPC Protocol Specification](ipc-protocol.md)
+**Full protocol details:** see [IPC Protocol Specification](core-runtime/ipc-protocol.md)
 
 ### Key Design Points
 

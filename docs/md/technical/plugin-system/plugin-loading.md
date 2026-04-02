@@ -206,7 +206,7 @@ myctl logs
 
 ## Related Docs
 
-- [Plugin SDK Quick Start](../dev/plugin-sdk/quick-start.md)
-- [Commands and Flags](../dev/plugin-sdk/adding-commands.md)
+- [Plugin SDK Quick Start](../../dev/plugin-sdk/quick-start.md)
+- [Commands and Flags](../../dev/plugin-sdk/adding-commands.md)
 - [Plugin Lifecycle](./lifecycle.md)
 
