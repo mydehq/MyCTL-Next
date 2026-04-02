@@ -1,4 +1,5 @@
 import DefaultTheme from "vitepress/theme";
+import { inject } from "@vercel/analytics";
 import "./style.css";
 import { metadata } from "../../vars.js";
 
@@ -10,5 +11,8 @@ export default {
   enhanceApp({ app, router, siteData }) {
     // Register metadata as a global property for Docusaurus-like shared variables
     app.config.globalProperties.metadata = metadata;
+    if (!import.meta.env.SSR) {
+      inject();
+    }
   },
 };
