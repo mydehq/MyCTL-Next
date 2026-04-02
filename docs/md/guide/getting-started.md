@@ -1,19 +1,19 @@
 # Getting Started
 
-Welcome to **MyCTL**, the high-performance desktop controller for Linux. This guide covers how to quickly initialize the system and explore your first system commands.
+Welcome to **MyCTL**. This guide helps you run your first commands and verify that the installation is working correctly.
 
-## Architecture: The Lean Proxy
+## Runtime Model
 
-MyCTL operates on a **Lean Client / Fat Server** architecture.
+MyCTL uses a lean client and a persistent background service.
 
-- **Client (`myctl`)**: A sub-millisecond $O(1)$ CLI that handles user input and displays output.
-- **Python Daemon (`myctld`)**: The persistent engine that manages system state and third-party plugins.
+- **Client (`myctl`)**: Runs your command and prints the result.
+- **Python service**: Keeps the command environment available between runs.
 
 > [!NOTE]
-> **Orchestration**: The Client uses `uv` to automatically bootstrap the daemon. You don't need to manually start the server before using MyCTL.
+> The client starts the service automatically when needed. You do not need to start it manually.
 
 
-## 🚀 The First Run
+## First Run
 
 After [Installation](./install.md), verify the connection by running a simple health check:
 
@@ -21,18 +21,18 @@ After [Installation](./install.md), verify the connection by running a simple he
 myctl ping
 ```
 
-If this is your first time running MyCTL:
+On first run:
 
-1.  **Cold Boot**: The Client detects the daemon is offline.
-2.  **UV Sync**: `uv` automatically downloads a private Python runtime and syncs all engine dependencies.
-3.  **Ready Signal**: Once the daemon is fully initialized, it signals the proxy to proceed.
+1. **Start up**: the client detects that the service is not running.
+2. **Environment setup**: `uv` prepares the managed Python environment.
+3. **Ready**: the service becomes available and the command runs.
 
 **Output:** `pong`
 
 
-## 🔊 Exploring Built-ins
+## Explore Built-in Commands
 
-MyCTL includes several native system integrations. Try the audio plugin:
+MyCTL includes built-in commands for common system tasks. Try the audio commands:
 
 ```bash
 # List all system audio outputs
@@ -41,13 +41,13 @@ myctl audio sink list
 # Mute your default speaker
 myctl audio sink mute
 
-# Check the current daemon status
+# Check the current service status
 myctl daemon status
 ```
 
 
 ## What's Next?
 
-- **[Command Reference](./command-reference.md)**: Full list of all builtin commands.
-- **[Plugin SDK](../dev/plugin-sdk.md)**: Build new MyCTL extensions.
-- **[Technical](../technical/overview.md)**: Read how things actually works internally.
+- **[Command Reference](./command-reference.md)**: Complete command list with examples.
+- **[Plugin SDK](../dev/plugin-sdk/)**: Build plugins with the public SDK.
+- **[Technical](../technical/overview.md)**: Learn how MyCTL works internally.

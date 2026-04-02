@@ -1,19 +1,20 @@
 # Command Reference
 
-A comprehensive list of built-in commands and their usage. For a complete command tree, run `myctl help` at any time.
+This page lists the built-in commands available to MyCTL users.
+For the complete command tree, run `myctl help` at any time.
 
-## ⚙️ Daemon Management
+## ⚙️ System Management
 
-The `daemon` commands provide control over the persistent MyCTL process and its managed environment.
+These commands control the MyCTL service and its runtime state.
 
-| Command              | Action  | Description                                                  |
-| :------------------- | :------ | :----------------------------------------------------------- |
-| **`daemon status`**  | Status  | Returns whether the daemon process is alive and operational. |
-| **`daemon stop`**    | Stop    | Gracefully shuts down the Python engine.                     |
-| **`daemon version`** | Version | Displays the version of the Client and the Daemon.            |
-| **`daemon ping`**    | Health  | Simple health-check (returns `pong`).                        |
-| **`daemon start`**   | Start   | Ensures the daemon is running. (Follows logs without `-b`).  |
-| **`daemon logs`**    | Logs    | Tails the daemon log file in the foreground.                 |
+| Command              | Action  | Description                                         |
+| :------------------- | :------ | :-------------------------------------------------- |
+| **`daemon status`**  | Status  | Shows whether MyCTL is running.                     |
+| **`daemon stop`**    | Stop    | Stops the MyCTL service gracefully.                 |
+| **`daemon version`** | Version | Displays the installed client and service versions. |
+| **`daemon ping`**    | Health  | Runs a quick health check and returns `pong`.       |
+| **`daemon start`**   | Start   | Starts MyCTL if it is not already running.          |
+| **`daemon logs`**    | Logs    | Displays recent service log output.                 |
 
 ### Global Flags
 
@@ -23,9 +24,9 @@ The `daemon` commands provide control over the persistent MyCTL process and its 
 
 ---
 
-## 🔊 Audio Control
+## Audio Control
 
-MyCTL integrates with PulseAudio and Pipewire for instant system sound management.
+MyCTL includes audio commands for managing the default output device.
 
 | Command                      | Namespace | Description                                                |
 | :--------------------------- | :-------- | :--------------------------------------------------------- |
@@ -36,29 +37,29 @@ MyCTL integrates with PulseAudio and Pipewire for instant system sound managemen
 
 ---
 
-## 🛠️ Developer SDK
+## SDK Utilities
 
-The `sdk` namespace provides tools for building and managing extensions.
+The `sdk` namespace provides tools for plugin development setup.
 
-| Command         | Action | Description                                                  |
-| :-------------- | :----- | :----------------------------------------------------------- |
-| **`sdk path`**  | Path   | Returns the path to the managed **UV virtual environment**.  |
-| **`sdk setup`** | Setup  | Configures your IDE (VSCode/PyCharm) for SDK autocompletion. |
+| Command         | Action | Description                                          |
+| :-------------- | :----- | :--------------------------------------------------- |
+| **`sdk path`**  | Path   | Returns the path to the managed virtual environment. |
+| **`sdk setup`** | Setup  | Configures your IDE for SDK autocompletion.          |
 
 ---
 
-## 🌍 Extensions & Plugins
+## Extensions & Plugins
 
-User-installed plugins appear at the root of the command tree. These are discovered automatically at startup.
+User-installed plugins appear at the root of the command tree and are discovered automatically at startup.
 
-| Namespace     | Tier | Description                                           |
-| :------------ | :--- | :---------------------------------------------------- |
-| **`weather`** | User | Example: Fetches meteorological data via OpenWeather. |
-| **`sysinfo`** | Dev  | Example: Displays hardware resource utilization.      |
+| Namespace     | Tier | Description                                   |
+| :------------ | :--- | :-------------------------------------------- |
+| **`weather`** | User | Example: Retrieves weather information.       |
+| **`sysinfo`** | Dev  | Example: Shows hardware resource utilization. |
 
-## 📜 Scripting & Automation
+## Scripting & Automation
 
-MyCTL is designed to be a first-class citizen in shell scripts.
+MyCTL is designed to work cleanly in shell scripts.
 
-- **Synchronous Execution**: The Client waits for the daemon's response before exiting, ensuring that sequential commands run in the correct order.
-- **Exit Codes**: The daemon passes native exit codes (0 for success, non-zero for errors) back to the Client, allowing for standard shell error handling (`if myctl stop; then ...`).
+- **Synchronous Execution**: The client waits for the service response before exiting, so commands can be chained reliably.
+- **Exit Codes**: MyCTL returns standard shell exit codes, so you can use it in conditionals and scripts.

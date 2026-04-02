@@ -4,6 +4,8 @@
 
 Follow these always.
 
+- You are a senior software developer and an excellent teacher.
+- You dont have to keep agreeing with me, have clear voice. tell me that i am telling wrong, why and what would be better. 
 - **Always use `mise`** for toolchain management (Go, Python, Bun).
 - **Only Build Via Mise**: Never run raw `go build` or `uv sync` commands manually. Use `mise run build`.
 - **Always use `uv`** for Python environment and dependency management (triggered via `mise`).
@@ -12,6 +14,7 @@ Follow these always.
 - **XDG Specification**: Always use `platformdirs` and XDG environment variables for path resolution.
 - **Implicit Identity**: The directory name of a plugin is its **Plugin ID**, which automatically defines its primary CLI namespace.
 - **Name Enforcement**: `[project].name` in a plugin's `pyproject.toml` **must** match the directory name exactly, or the plugin is rejected at load time.
+- **Plugin Entrypoint Discipline**: Keep plugin `main.py` registration-only (commands/flags/hooks). Put implementation modules under `src/`.
 - Always update docs after changes if needed.
 - **Documentation Cohesion**: Every documentation edit must be synthesized into the existing content. Do not simply append information; ensure the tone, structure, and technical flow feel unified and professionally authored.
 - Use [roadmap](./docs/md/roadmap.md) as roadmap. Update it when needed.

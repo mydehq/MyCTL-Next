@@ -40,7 +40,7 @@ Because `self._commands` is essentially a JSON-compatible tree, the daemon can m
 
 ### Tree Inflation Algorithm (`add_cmd`)
 
-During the plugin discovery phase, each call to `@registry.add_cmd` invokes the `CommandRegistry.add_cmd` method. This method is responsible for building the nested dictionary hierarchy incrementally, inserting nodes one at a time as plugins register their commands.
+During the plugin discovery phase, each call to `@plugin.command` contributes metadata captured by the plugin instance. The registry iterates those handlers and invokes `CommandRegistry.add_cmd` to build the nested dictionary hierarchy incrementally, inserting nodes one at a time.
 
 The algorithm works as follows:
 
@@ -77,6 +77,26 @@ self._commands = {
 
 Group metadata (help text) is applied _after_ all `add_cmd` registrations during `discover()`, using the `groups` table from `pyproject.toml`'s `[tool.myctl]` section. This two-pass approach allows the manifest to document groups that may not yet exist when the plugin's `main.py` begins executing.
 
+### Flag Metadata
+
+Flags are registered alongside commands via the `@plugin.flag` decorator. The SDK normalizes these flags (adding prefixes, hyphenating names, and inferring types) before they are stored in the registry's command tree.
+
+The `flags` list in a command node contains objects used by the system for:
+1.  **Schema Generation**: The `__sys_schema` command exports these flags to the Go client for CLI generation.
+2.  **Argparse Pre-parsing**: The `dispatch` method uses this metadata to construct an internal `argparse.ArgumentParser` that validates and extracts flag values from `ctx.args` before the handler is executed.
+
+```python
+# Internal flag metadata structure
+{
+    "name": "--output-format",
+    "short": "-f",
+    "type": "str",
+    "default": "text",
+    "required": False,
+    "help": "Set output format"
+}
+```
+
 ---
 
 ## 2. Dispatch & Execution Flow
@@ -95,14 +115,14 @@ for segment in path[1:]:
     current = current["children"][segment]
 
 # Await the execution of the isolated plugin logic
-await current["handler"](request)
+await current["handler"](ctx)
 ```
 
 By strictly utilizing memory pointers rather than string-based evaluation, the core routing loop achieves native execution speed, moving from the network socket to the function logic in microseconds.
 
 ### Path Resolution Strategy
 
-The actual `dispatch` method in `CommandRegistry` has an important subtlety: it must determine not only _which_ handler to invoke, but also which portion of the request's `path` array represents the command route vs. the user-supplied arguments.
+The actual `dispatch` method in `CommandRegistry` has an important subtlety: it must determine not only _which_ handler to invoke, but also which portion of the context `path` array represents the command route vs. the user-supplied arguments.
 
 The resolver uses an `args_start_idx` cursor that advances as each tree segment is matched:
 
@@ -110,8 +130,8 @@ The resolver uses an `args_start_idx` cursor that advances as each tree segment 
 current = self._commands[plugin_id]    # Start at the plugin root node
 args_start_idx = 1
 
-for i in range(1, len(req.path)):
-    part = req.path[i]
+for i in range(1, len(ctx.path)):
+    part = ctx.path[i]
     if "children" in current and part in current["children"]:
         current = current["children"][part]  # Descend the tree
         args_start_idx = i + 1              # Advance cursor past matched segment
@@ -119,6 +139,6 @@ for i in range(1, len(req.path)):
         break                               # Unknown segment = start of user args
 ```
 
-After traversal, `req.args` is sliced from `args_start_idx` onward. This allows a command registered as `"volume set"` to correctly receive `["50"]` in its `req.args` when the user runs `myctl audio volume set 50`, even though the original `req.path` was `["audio", "volume", "set", "50"]`.
+After traversal, `ctx.args` is sliced from `args_start_idx` onward. This allows a command registered as `"volume set"` to correctly receive `["50"]` in its `ctx.args` when the user runs `myctl audio volume set 50`, even though the original `ctx.path` was `["audio", "volume", "set", "50"]`.
 
 If traversal terminates on a `"group"` node (i.e., the user didn't provide a full command path), the daemon returns an `err()` response with the group's help text, which the Cobra client then renders as a formatted help page.

@@ -65,8 +65,8 @@ export default withMermaid({
               { text: "Introduction", link: "/dev/plugin-sdk/" },
               { text: "Quick Start", link: "/dev/plugin-sdk/quick-start" },
               { text: "Manifest Reference", link: "/dev/plugin-sdk/manifest" },
-              { text: "Commands & Flags", link: "/dev/plugin-sdk/commands" },
-              { text: "Lifecycle & Tasks", link: "/dev/plugin-sdk/lifecycle" },
+              { text: "Adding Commands & Flags", link: "/dev/plugin-sdk/adding-commands" },
+              { text: "Hooks & Tasks", link: "/dev/plugin-sdk/hooks" },
               { text: "API Reference", link: "/dev/plugin-sdk/api" },
             ],
           },
@@ -75,10 +75,37 @@ export default withMermaid({
       },
       {
         text: "Technical Reference",
-        collapsed: true,
+        collapsed: false,
         items: [
           { text: "Overview", link: "/technical/overview" },
           { text: "Refactor", link: "/technical/daemon-architecture-vision" },
+          {
+            text: "Core Runtime",
+            collapsed: true,
+            items: [
+              { text: "System Architecture", link: "/technical/architecture" },
+              { text: "Bootstrapping", link: "/technical/bootstrapping" },
+              { text: "IPC Protocol", link: "/technical/ipc-protocol" },
+              { text: "Core Engine & Registry", link: "/technical/registry" },
+            ],
+          },
+          {
+            text: "Plugin System",
+            collapsed: true,
+            items: [
+              { text: "Plugin Loading", link: "/technical/plugin-loading" },
+              { text: "Plugin Discovery", link: "/technical/plugin-discovery" },
+              { text: "Plugin Lifecycle", link: "/technical/lifecycle" },
+            ],
+          },
+          {
+            text: "Quality & Governance",
+            collapsed: true,
+            items: [
+              { text: "Performance Benchmarks", link: "/technical/benchmarks" },
+              { text: "Permission Model (Planned)", link: "/technical/permissions" },
+            ],
+          },
         ],
       },
     ],

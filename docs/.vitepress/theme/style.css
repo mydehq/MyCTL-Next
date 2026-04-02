@@ -83,8 +83,16 @@
 
   /* Component Overrides: Home Hero */
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(135deg, #646cff 10%, #42b883 100%);
-  --vp-home-hero-image-background-image: linear-gradient(135deg, #646cff 50%, #42b883 50%);
+  --vp-home-hero-name-background: linear-gradient(
+    135deg,
+    #646cff 10%,
+    #42b883 100%
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    135deg,
+    #646cff 50%,
+    #42b883 50%
+  );
   --vp-home-hero-image-filter: blur(44px);
 
   /* Component Overrides: Custom Block */
@@ -103,9 +111,9 @@
   line-height: 1.1;
 }
 
-h1, .vp-doc h1 {
+.vp-doc h1 {
   text-align: center;
-  margin-top: -.4rem;
+  margin-top: -0.4rem;
   margin-bottom: 2rem;
 }
 
@@ -119,14 +127,22 @@ h1, .vp-doc h1 {
  * -------------------------------------------------------------------------- */
 
 @media (max-width: 640px) {
-  .VPHomeHero .name { font-size: 3.2rem; }
-  .VPHomeHero .text { font-size: 1.8rem; }
+  .VPHomeHero .name {
+    font-size: 3.2rem;
+  }
+  .VPHomeHero .text {
+    font-size: 1.8rem;
+  }
 }
 
 @media (min-width: 640px) {
-  :root { --vp-home-hero-image-filter: blur(56px); }
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
 }
 
 @media (min-width: 960px) {
-  :root { --vp-home-hero-image-filter: blur(68px); }
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
 }

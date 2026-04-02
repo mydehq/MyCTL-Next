@@ -1,34 +1,34 @@
 # Installation Guide
 
-MyCTL is designed to be a high-performance system controller that runs with minimal system dependencies. This guide covers the two primary tools required to build and execute the system.
+This guide covers the tools you need to install MyCTL and run the first command successfully.
 
-## 🛠 Prerequisites
+## Prerequisites
 
 Ensure the following tools are available in your system path:
 
-1.  **<a :href="metadata.tools.go">Go 1.22+</a>**: Used to build and compile the lean CLI Client.
-2.  **<a :href="metadata.tools.uv">uv</a>**: Our primary runtime orchestrator. `uv` manages the Python environment, dependencies, and daemon bootstrapping.
+1. **<a :href="metadata.tools.go">Go 1.22+</a>**: Used to build the CLI client.
+2. **<a :href="metadata.tools.uv">uv</a>**: Used to manage the Python environment for the daemon.
 
 > [!NOTE]
-> **Minimal System Requirement**: You do **not** need a globally installed Python 3 shell to use MyCTL. `uv` will automatically download and manage its own private Python runtime for the daemon.
+> You do not need a globally installed Python 3 runtime. `uv` will download and manage a private Python environment for MyCTL.
 
 ---
 
-## 🏗 Building from Source
+## Build From Source
 
-MyCTL uses `mise` for streamlined task management (optional but recommended).
+MyCTL uses `mise` for task management, but it is optional.
 
 ### 1. Build the Client
 
-Compile the Client from the project root:
+Compile the client from the project root:
 
 ```bash
 go build -o ./bin/myctl ./cmd
 ```
 
-### 2. Verify UV Availability
+### 2. Verify `uv`
 
-MyCTL relies on `uv` to orchestrate the daemon. Confirm it is installed:
+Confirm `uv` is installed:
 
 ```bash
 uv --version
@@ -36,12 +36,12 @@ uv --version
 
 ---
 
-## 🚀 The First Run
+## First Run
 
-Once built, you can trigger the **Universal Orchestration** by running any command. This will prompt `uv` to create the isolated environment and sync all core dependencies:
+After building, run a command to start MyCTL and verify the environment:
 
 ```bash
 ./bin/myctl start
 ```
 
-For professional desktop installations, you may wish to add the `./bin` directory to your shell's `PATH`.
+If you want to use the local binary directly, add `./bin` to your shell `PATH`.

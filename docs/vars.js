@@ -14,8 +14,8 @@ export const metadata = {
 
   // 🏗 Infrastructure Paths
   paths: {
-    venv: "~/.local/share/myctl/venv",
-    plugins: "~/.local/share/myctl/plugins",
+    venv: "$XDG_DATA_HOME/myctl/venv",
+    plugins: "$XDG_DATA_HOME/myctl/plugins",
     socket: "$XDG_RUNTIME_DIR/myctl/myctld.sock",
     logs: "$XDG_STATE_HOME/myctl/daemon.log",
   },

@@ -1,72 +1,157 @@
-# Architecture: The Managed Runtime Engine
+# System Architecture
 
-MyCTL subverts the traditional CLI model. Instead of hardcoding commands, parsing logic, and execution functions into a single compiled binary, MyCTL employs a **100% Logic-Less Client** orchestrated by **UV** and backed by a **Persistent Python Engine**.
+## Goal
 
-This architecture guarantees sub-millisecond CLI responsiveness from a portable Client, while maintaining a rich, stateful, and dynamically extensible backend environment that is entirely self-managed.
+MyCTL is designed to keep command execution fast while allowing dynamic plugin-based behavior.
 
-## 🗺️ Codebase Topology
+It does this with a **lean client + persistent daemon** model:
 
-To understand the architecture, developers must first map the concepts to the physical repository. The codebase is strictly bifurcated:
-
-- **`cmd/` (The Client Layer)**
-  - `main.go`: The central entry point. Responsible for dialing the Unix Socket, fetching the JSON schema, inflating the Cobra CLI tree, and proxying raw arguments to the engine.
-  - `daemon.go`: The **UV-Native Orchestrator**. Only invoked if the Unix Socket is missing. It manages the runtime environment and launches the engine.
-- **`daemon/` (The Engine Layer)**
-  - `myctld`: The Python entry point. An extremely lean bootstrapper designed for execution via `uv run`.
-  - `myctl/core/registry.py`: The brain. Constructs the $O(1)$ routing dictionary, loads plugins via `importlib`, and handles SDK auto-injection.
-  - `myctl/core/ipc.py`: The `asyncio` Unix Socket server loop.
-- **`plugins/` (The Extension Tier)**
-  - Tiered directories containing a `pyproject.toml` manifest and a standard `main.py` logic entry.
+- Go client: fast startup, argument forwarding, output rendering
+- Python daemon: command registry, plugin loading, lifecycle management
 
 ---
 
-## 🏎️ The Logic-Less Client
+## High-Level Components
 
-The `myctl` Client is designed to guarantee ultra-fast cold starts and a zero-dependency system footprint. However, its source code contains zero domain logic—it doesn't even know what commands it supports natively.
+### 1. Client Layer (Go)
 
-### 1. Dynamic Tree Inflation (`spf13/cobra`)
+Location: `cmd/`
 
-Usually, developers hardcode commands via `rootCmd.AddCommand()`. MyCTL instead fetches a JSON payload from the Python daemon during initialization. The client recursively traverses this JSON using the `buildCobraCommand` function, unmarshaling the payload into living `*cobra.Command` pointers.
+- Builds CLI surface from daemon-provided schema
+- Sends command requests over Unix socket
+- Handles daemon bootstrap when needed
 
-This means the Client automatically inherits new features and documentation updates directly from Python without ever requiring a recompile.
+Main files:
 
-Because the Client builds its CLI tree dynamically, it cannot know ahead of time what specific flags (e.g., `--volume 50`) a deeply nested plugin might require. To prevent Cobra from failing, the Client applies a global bypass:
-...
-This forces Cobra to collect unmapped flags and pass them blindly into the unparsed argument slice. The Client then shovels this raw array across the IPC tunnel, allowing Python to perform the actual deterministic parsing.
+- `cmd/main.go`
+- `cmd/daemon.go`
 
-### 3. Pristine Console Output
+### 2. Daemon Layer (Python)
 
-Standard system loggers are often unsuitable for professional CLI tools. MyCTL leverages `zerolog` with a heavily customized `ConsoleWriter`. We strip timestamps and generic field names to provide color-coded terminal output that mimics native shell applications.
+Location: `daemon/myctl/core/`
+
+- Runs continuously in background
+- Loads/discovers plugins
+- Dispatches command handlers
+- Returns NDJSON responses
+
+Main files:
+
+- `daemon/myctl/core/app.py`
+- `daemon/myctl/core/ipc.py`
+- `daemon/myctl/core/registry.py`
+
+### 3. Plugin Layer
+
+Location: `plugins/` (plus user/system plugin paths)
+
+- Extends command tree
+- Registers commands via SDK decorators
+- Keeps implementation in `src/`
 
 ---
 
-## 🧠 The Persistent Engine (Python)
+## Runtime Request Flow
 
-The core execution logic resides in a continuous, stateful `myctld` Python daemon ({{metadata.versions.python_min}}). While Python scripts are traditionally slow to start, pushing the engine into the background solves this constraint while maintaining a rich system-integration ecosystem.
+```mermaid
+flowchart LR
+    U[User] --> C[Go Client]
+    C -->|NDJSON over Unix Socket| D[Python Daemon]
+    D --> R[Command Registry]
+    R --> P[Plugin Handler]
+    P --> R
+    R --> D
+    D --> C
+    C --> U
+```
 
-### 1. Asynchronous Concurrency (`asyncio`)
+Step-by-step:
 
-The daemon implementation is built entirely on `asyncio`. It binds to a Unix Socket using `asyncio.start_unix_server`, which assigns every incoming connection to a unique task in the event loop.
+1. User runs `myctl <path> [args]`.
+2. Client sends request payload to daemon.
+3. Daemon resolves handler in registry.
+4. Plugin handler executes.
+5. Daemon returns status/data/exit code.
+6. Client prints output and exits.
 
-- **Concurreny Strategy**: Each `handle_client` invocation is an independent coroutine. This allows a plugin performing a long-running system call (e.g., `subprocess.run`) to yield control back to the loop, ensuring that `ping` or `status` requests from other CLI instances remain responsive.
-- **Event Loop Management**: The daemon runs a single-threaded event loop, leveraging non-blocking socket IO. This architecture is perfect for a CLI controller where the primary bottleneck is high-latency system integration rather than raw CPU calculation.
+---
 
-### 2. The IPC Lifecycle (`handle_client`)
+## Why This Split Exists
 
-Every interaction between the Client and Engine follows a strict Request/Response lifecycle managed by the `DaemonServer`:
+### Fast UX
 
-1.  **Read (NDJSON)**: The `asyncio.StreamReader` waits for a single newline-delimited line. The Engine expects a JSON object matching the `Request` schema (path, args, cwd, env).
-2.  **Inflation**: The raw JSON is unmarshaled into a Python `Request` object.
-3.  **Dispatch**: The `CommandRegistry` traverses its internal memory map to find the target `handler`.
-4.  **Write**: The result is serialized to NDJSON and pushed to the `asyncio.StreamWriter`.
-5.  **Drain & Close**: The Engine calls `writer.drain()` to ensure the buffer is flushed before explicitly closing the connection. The Client receives the EOF, parses the status, and terminates.
+The Go binary starts quickly, even for tiny commands.
 
-### 3. Sandbox Isolation & UV Integration
+### Dynamic Features
 
-Furthermore, absolutely everything the daemon touches adheres to strict XDG Base Directory standards:
+The daemon can discover plugin commands at runtime, so command surface is not hardcoded in the client.
 
-| Component        | Path Strategy                          | Default Environment Path     |
-| :--------------- | :------------------------------------- | :--------------------------- |
-| **Sandbox Venv** | `xdg.DataHome`                         | `{{metadata.paths.venv}}`    |
-| **User Plugins** | `xdg.DataHome`                         | `{{metadata.paths.plugins}}` |
-| **Socket IPC**   | `xdg.RuntimeDir` -> `$UID` -> fallback | `{{metadata.paths.socket}}`  |
+### Better Extensibility
+
+Plugin authors only touch Python plugin code; no Go client rebuild needed for new plugin commands.
+
+---
+
+## Cold Boot vs Warm Run
+
+### Warm Run
+
+- Daemon is already online
+- Client connects and executes immediately
+
+### Cold Boot
+
+- Daemon socket is missing/offline
+- Client starts daemon via `uv`
+- After daemon signals ready, request proceeds
+
+See [Bootstrapping](./bootstrapping.md) for full lifecycle details.
+
+---
+
+## Core Contracts Between Client and Daemon
+
+### IPC Contract
+
+All communication uses newline-delimited JSON over Unix socket.
+
+See [IPC Protocol](./ipc-protocol.md).
+
+### Schema Contract
+
+Client asks daemon for command schema and inflates CLI tree dynamically.
+
+See [Core Engine and Registry](./registry.md).
+
+### Plugin Contract
+
+Plugin ID is directory name, and package-context loading isolates imports.
+
+See [Plugin Loading](./plugin-loading.md) and [Plugin Discovery](./plugin-discovery.md).
+
+---
+
+## Common Failure Boundaries
+
+### Client Side
+
+- Daemon not reachable
+- Bootstrap failure
+
+### Daemon Side
+
+- Plugin validation failure
+- Dependency sync failure
+- Import/runtime exceptions in plugin handlers
+
+MyCTL is designed to keep daemon alive even when individual plugins fail to load.
+
+---
+
+## Summary
+
+- Go client is intentionally thin.
+- Python daemon owns business logic.
+- Registry and plugins provide extensibility.
+- Package-context loading prevents plugin import collisions.
+- IPC keeps contract simple and observable.

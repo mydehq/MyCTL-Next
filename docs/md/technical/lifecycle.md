@@ -28,16 +28,16 @@ If the validation succeeds and the plugin declares `dependencies` in its manifes
 
 The final and most sensitive phase is the actual dynamic execution of the `main.py` entry point.
 
-1.  **Sandbox Creation**: The module is injected with a local `__name__` equal to the Plugin ID.
-2.  **SDK Hooking**: The `@registry.add_cmd` decorators fire, appending command routes to the central tree.
-3.  **The `on_load` Execution**: The Engine searches the temporary `myctl.api._load_hooks` list. If the plugin registered an `@on_load` setup function, it is executed here sequentially.
+1.  **Namespace Package Creation**: The Engine creates `myctl_plugins.<plugin_id>` and loads `main.py` as a submodule in that namespace.
+2.  **Decorator Registration**: The plugin instance (`plugin = Plugin("<id>")`) exposes `@plugin.command`, `@plugin.flag`, `@plugin.on_load`, and `@plugin.periodic` metadata.
+3.  **The `on_load` Execution**: The Engine executes registered `on_load` hooks sequentially.
 
 ### Phase 4: Background Runtime
 
 Upon a successful `on_load`, the plugin is considered "Active" and the daemon resumes its standard operation.
 
-- Action handlers (`@add_cmd`) only sit idle in memory until dispatched by IPC.
-- Background tasks (`@periodic`) are extracted and passed to the `asyncio` event loop.
+- Action handlers (`@plugin.command`) only sit idle in memory until dispatched by IPC.
+- Background tasks (`@plugin.periodic`) are extracted and passed to the `asyncio` event loop.
 
 ---
 
@@ -47,9 +47,9 @@ The `on_load` function acts as a definitive health check. If a plugin's setup lo
 
 ```python
 plugin_failed = False
-for hook in myctl.api._load_hooks:
+for hook in plugin_instance._load_hooks:
     try:
-        await hook()  # or hook() if synchronous
+        await hook(ctx)  # or hook() when no context param is declared
     except Exception as e:
         logging.error(f"Plugin '{plugin_id}' critical initialization failure: {e}")
         plugin_failed = True
@@ -67,7 +67,7 @@ By safely deleting the `plugin_id` root from the `_commands` routing table, the 
 
 ## 3. Background Task Resilience (`_periodic_wrapper`)
 
-While a plugin failing to load is cleanly rejected, a plugin failing _during_ a background `@periodic` task poses a threat to the asynchronous architecture.
+While a plugin failing to load is cleanly rejected, a plugin failing _during_ a background `@plugin.periodic` task poses a threat to the asynchronous architecture.
 
 To prevent a bad `while True:` loop or network timeout from terminating the daemon or silently exiting an `asyncio.Task`, the Engine wraps every background job in a resilient boundary:
 

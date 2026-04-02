@@ -5,7 +5,7 @@ This document serves as the **IPC reference for external developers**—frontend
 > [!NOTE]
 > **Prerequisites**: Familiarize yourself with the [IPC Protocol](../technical/ipc-protocol.md) for wire format details (NDJSON over Unix Socket).
 
-## 📥 Request Pattern
+## Request Pattern
 
 All requests must be sent as single-line JSON objects followed by a newline (`\n`):
 
@@ -18,7 +18,7 @@ All requests must be sent as single-line JSON objects followed by a newline (`\n
 }
 ```
 
-## 📤 Response Pattern
+## Response Pattern
 
 The daemon responds with a single-line JSON object:
 
@@ -32,7 +32,7 @@ The daemon responds with a single-line JSON object:
 
 ---
 
-## 🛠️ Health & Discovery
+## Health & Discovery
 
 ### `ping`
 
@@ -89,7 +89,7 @@ Returns the most recent tail activity (up to 30 lines) directly from the persist
 
 ---
 
-## 📊 Runtime Status
+## Runtime Status
 
 ### `status` (Daemon Status)
 
@@ -107,7 +107,7 @@ A user-friendly alias for `__sys_logs`. It returns the most recent 30 lines from
 
 ---
 
-## 🔄 Lifecycle Management
+## Lifecycle Management
 
 ### `stop`
 
@@ -118,7 +118,7 @@ Initiates a graceful shutdown of the daemon process.
 
 ### `restart`
 
-The daemon terminates gracefully. The next client connection will trigger a fresh initialization sequence, re-discovering all plugins from disk.
+Triggers a graceful daemon restart. The client re-establishes daemon readiness immediately, re-discovering all plugins from disk.
 
 - **Request**: `{ "path": ["restart"] }`
 - **Response**: `Daemon restarting...`
@@ -128,7 +128,7 @@ The daemon terminates gracefully. The next client connection will trigger a fres
 
 ---
 
-## 🧩 Executing Plugins
+## Executing Plugins
 
 Any plugin command can be dispatched by its full path. For example, to call `myctl audio volume set 50`:
 
@@ -145,7 +145,7 @@ Any plugin command can be dispatched by its full path. For example, to call `myc
 
 ---
 
-## 🔬 Diagnostic Probing
+## Diagnostic Probing
 
 Because the protocol is plain-text, you can use standard Unix tools to probe the daemon:
 

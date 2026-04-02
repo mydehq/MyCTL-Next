@@ -17,7 +17,7 @@ Once the newline is reached, the Client unmarshals the payload, renders the outp
 
 ---
 
-## 🔒 Payload Specifications
+## Payload Specifications
 
 The communication between the client and server relies on strict structural payloads that map directly between Go and Python.
 
@@ -58,21 +58,38 @@ The Python engine executes the handler and responds with exactly one JSON object
 
 ```go
 type Response struct {
-    Status   string      `json:"status"`
+    Status   int         `json:"status"`
     Data     interface{} `json:"data"`
     ExitCode int         `json:"exit_code"`
 }
 ```
 
-- **`status`**: `"ok"` or `"error"`.
-- **`data`**: Can be a flat string or a nested object. The Client determines the output format:
-  - **Strings**: Printed directly to `stdout`.
-  - **Dicts/Lists**: Pretty-printed as JSON for pipeability (e.g., to `jq`).
-- **`exit_code`**: Governs shell scripting integration (e.g., `os.Exit(resp.ExitCode)`).
+The transport uses numeric status codes rather than string literals:
+
+| Code | Symbolic Name | Meaning                                            |
+| :--- | :------------ | :------------------------------------------------- |
+| `0`  | `OK`          | Command completed successfully.                    |
+| `1`  | `ERROR`       | Command failed.                                    |
+| `2`  | `ASK`         | Daemon is asking the client for interactive input. |
+
+- For `OK`, `data` is the payload to render (string, dict, list).
+- For `ERROR`, `data` is the error message.
+- For `ASK`, `data` is an object with the prompt text and optional secret-input flag.
+
+### Interactive `"ask"` Loop
+
+The MyCTL client natively supports multi-turn IPC communication without buffering state. If `status == 2` (`ASK`):
+1. The daemon sends a payload shaped like `{"prompt": "...", "secret": false}`.
+2. The client prints the prompt to the terminal.
+3. If `secret` is `true` and the user is in a TTY, the client reads masked input.
+4. The client repacks the user's input as `{"data": "<input>"}\n` and sends it back over the **same open socket**.
+5. The client continues reading from the socket recursively, waiting for a final `0` (`OK`), `1` (`ERROR`), or another `2` (`ASK`).
+
+This guarantees typical non-interactive commands execute at pure $O(1)$ networking latency, whilst still supporting deep plugin interactivity.
 
 ---
 
-## 📁 Socket Configuration
+## Socket Configuration
 
 The architecture adheres to XDG standards to ensure isolation and security.
 
@@ -92,7 +109,7 @@ echo '{"path": ["ping"]}' | nc -U {{metadata.paths.socket}}
 
 ---
 
-## 🔐 Reserved System Namespace
+## Reserved System Namespace
 
 The Engine contains a set of reserved commands that are always available, regardless of which plugins are loaded. Their routing keys are prefixed with `__sys_` to prevent collision with user-created plugin namespaces. These are dispatched inside `CommandRegistry` before the plugin routing table is ever consulted.
 
@@ -109,7 +126,7 @@ The full set of system aliases (e.g., `stop`, `exit`, `quit`) are registered in 
 
 ---
 
-## 🛡️ Client-Side Fault Tolerance
+## Client-Side Fault Tolerance
 
 The Client implements a layered protocol for handling daemon-unreachable states, with "Cold Boot" as the recovery mechanism.
 

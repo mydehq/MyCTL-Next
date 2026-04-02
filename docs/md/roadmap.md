@@ -53,12 +53,12 @@ graph TD
 
 Items in the strategic backlog for subsequent releases.
 
-- ✅ **`on_load` Lifecycle Hook**: `@registry.on_load` for async plugin setup (hardware connection, DBus init).
-- ✅ **Built-in Logger**: `from myctl.api import logger` — per-plugin scoped logger writing to daemon log file.
+- ✅ **`on_load` Lifecycle Hook**: `@plugin.on_load` for async plugin setup (hardware connection, DBus init).
+- ✅ **Built-in Logger**: `log` per-plugin scoped logging to daemon log file.
 - ✅ **Manifest-Driven Group Help**: Sub-group descriptions declared in `[tool.myctl.groups]` in `pyproject.toml`, applied by the discovery engine.
 - ✅ **Dependency Auto-Management**: `uv pip install <plugin_dir>` for syncing requirements into the daemon venv at discovery time.
 - ✅ **UV-Native Orchestration (V2.5)**: The Client now acts as a `uv` launcher, managing managed Python runtimes and environment sync out-of-band.
-- ✅ **Declarative Flag Engine (V2.8)**: Implementing `@registry.add_flag` for typed pre-parsing.
+- ✅ **Declarative Flag Engine (V2.8)**: Implementing `@plugin.flag` for typed pre-parsing.
 - 📅 **Rich UI Injection**: Native TUI (Rich/Textual) support for interactive commands.
 - 📝 **[Permission Governance](./technical/permissions.md)**: Capability manifest enforcement for plugins (Drafting Technical Spec).
 
