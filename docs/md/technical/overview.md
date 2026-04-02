@@ -38,21 +38,21 @@ sequenceDiagram
 
 ### 1) Core Runtime
 
-- [System Architecture](./architecture): End-to-end design and responsibilities.
-- [Bootstrapping](./bootstrapping): How daemon startup and cold boot work.
-- [IPC Protocol](./ipc-protocol): Request/response format and command transport.
-- [Core Engine and Registry](./registry): How commands are stored and dispatched.
+- [System Architecture](./core-runtime/architecture): End-to-end design and responsibilities.
+- [Bootstrapping](./core-runtime/bootstrapping): How daemon startup and cold boot work.
+- [IPC Protocol](./core-runtime/ipc-protocol): Request/response format and command transport.
+- [Core Engine and Registry](./core-runtime/registry): How commands are stored and dispatched.
 
 ### 2) Plugin System
 
-- [Plugin Loading](./plugin-loading): Namespaced loading model and import safety.
-- [Plugin Discovery](./plugin-discovery): Tiered paths and plugin shadowing rules.
-- [Plugin Lifecycle](./lifecycle): Load hooks, periodic tasks, and failure handling.
+- [Plugin Loading](./plugin-system/plugin-loading): Namespaced loading model and import safety.
+- [Plugin Discovery](./plugin-system/plugin-discovery): Tiered paths and plugin shadowing rules.
+- [Plugin Lifecycle](./plugin-system/lifecycle): Load hooks, periodic tasks, and failure handling.
 
 ### 3) Quality and Governance
 
-- [Performance Benchmarks](./benchmarks): Why the client is implemented in Go.
-- [Permission Model (Planned)](./permissions): Planned security model, not implemented yet.
+- [Performance Benchmarks](./quality-governance/benchmarks): Why the client is implemented in Go.
+- [Permission Model (Planned)](./quality-governance/permissions): Planned security model, not implemented yet.
 
 
 ## Fast Sanity Commands

@@ -21,7 +21,7 @@ myctl <command>  →  client Proxy  →  Unix Socket (IPC)  →  Python Daemon
 
 ### From Source
 
-**Prerequisites**: `mise`, `go`, `python 3.13+`, `uv`
+**Prerequisites**: `mise`, `go`, `python 3.14+`, `uv`
 
 ```bash
 git clone https://github.com/mydehq/myctl && cd myctl

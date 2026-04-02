@@ -70,7 +70,7 @@ export default withMermaid({
               { text: "API Reference", link: "/dev/plugin-sdk/api" },
             ],
           },
-          { text: "Server API (IPC)", link: "/dev/server-api" },
+          { text: "Client API (IPC)", link: "/dev/client-api" },
         ],
       },
       {
@@ -84,26 +84,26 @@ export default withMermaid({
             collapsed: true,
             items: [
               { text: "System Architecture", link: "/technical/architecture" },
-              { text: "Bootstrapping", link: "/technical/bootstrapping" },
-              { text: "IPC Protocol", link: "/technical/ipc-protocol" },
-              { text: "Core Engine & Registry", link: "/technical/registry" },
+              { text: "Bootstrapping", link: "/technical/core-runtime/bootstrapping" },
+              { text: "IPC Protocol", link: "/technical/core-runtime/ipc-protocol" },
+              { text: "Core Engine & Registry", link: "/technical/core-runtime/registry" },
             ],
           },
           {
             text: "Plugin System",
             collapsed: true,
             items: [
-              { text: "Plugin Loading", link: "/technical/plugin-loading" },
-              { text: "Plugin Discovery", link: "/technical/plugin-discovery" },
-              { text: "Plugin Lifecycle", link: "/technical/lifecycle" },
+              { text: "Plugin Loading", link: "/technical/plugin-system/plugin-loading" },
+              { text: "Plugin Discovery", link: "/technical/plugin-system/plugin-discovery" },
+              { text: "Plugin Lifecycle", link: "/technical/plugin-system/lifecycle" },
             ],
           },
           {
             text: "Quality & Governance",
             collapsed: true,
             items: [
-              { text: "Performance Benchmarks", link: "/technical/benchmarks" },
-              { text: "Permission Model (Planned)", link: "/technical/permissions" },
+              { text: "Performance Benchmarks", link: "/technical/quality-governance/benchmarks" },
+              { text: "Permission Model (Planned)", link: "/technical/quality-governance/permissions" },
             ],
           },
         ],

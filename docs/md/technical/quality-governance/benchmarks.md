@@ -14,7 +14,7 @@ The benchmarks measure two critical performance metrics across three client impl
 | Implementation         | Tooling                 | CLI Engine             |
 | :--------------------- | :---------------------- | :--------------------- |
 | **Go (Production)**    | Go 1.24+                | `spf13/cobra`          |
-| **Python (Optimized)** | Python 3.13 / `.venv`   | `argparse` (Fast-Path) |
+| **Python (Optimized)** | Python 3.14 / `.venv`   | `argparse` (Fast-Path) |
 | **Python (Compiled)**  | Nuitka 4.0 (Standalone) | `argparse` (Fast-Path) |
 
 ## Results Summary

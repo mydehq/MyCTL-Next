@@ -29,10 +29,15 @@ The Client sends exactly one JSON object per command containing the context requ
 
 ```go
 type Request struct {
-    Path []string          `json:"path"`
-    Args []string          `json:"args"`
-    Cwd  string            `json:"cwd"`
-    Env  map[string]string `json:"env"`
+        Path     []string `json:"path"`
+        Args     []string `json:"args"`
+        Cwd      string   `json:"cwd"`
+        Terminal struct {
+                IsTTY      bool   `json:"is_tty"`
+                ColorDepth  string `json:"color_depth"`
+                NoColor     bool   `json:"no_color"`
+        } `json:"terminal"`
+        Env map[string]string `json:"env"`
 }
 ```
 
@@ -42,13 +47,21 @@ type Request struct {
 {
   "path": ["audio", "sink", "mute"],
   "args": ["--all"],
-  "env": { "USER": "soymadip", "DISPLAY": ":0" },
-  "cwd": "/home/soymadip/Projects/MyCTL"
+    "cwd": "/home/soymadip/Projects/MyCTL",
+    "terminal": {
+        "is_tty": true,
+        "color_depth": "256",
+        "no_color": false
+    },
+    "env": { "USER": "soymadip", "DISPLAY": ":0" }
 }
 ```
 
 > [!NOTE]
 > **The `cwd` Context**: Since the Python Engine runs continuously in the background, its internal working directory does not match the user's shell. Passing `cwd` over IPC allows plugins to accurately resolve local paths (e.g., `myctl edit ./config.json`).
+
+> [!IMPORTANT]
+> The `terminal` block is required for all command requests. It is the source of truth for rendering decisions and replaces the old env-based capability guessing logic.
 
 ### 2. The Response Payload (Python -> Client)
 
@@ -93,10 +106,9 @@ This guarantees typical non-interactive commands execute at pure $O(1)$ networki
 
 The architecture adheres to XDG standards to ensure isolation and security.
 
-| Path                            | Purpose                                          |
-| :------------------------------ | :----------------------------------------------- |
-| **`{{metadata.paths.socket}}`** | Primary IPC bind point.                          |
-| **`/tmp/myctl-$UID.sock`**      | Legacy fallback if `XDG_RUNTIME_DIR` is missing. |
+| Path                            | Purpose                 |
+| :------------------------------ | :---------------------- |
+| **`{{metadata.paths.socket}}`** | Primary IPC bind point. |
 
 ### Diagnostic Access
 
@@ -104,25 +116,31 @@ Because the protocol is plain-text NDJSON, you can debug the Python Engine indep
 
 ```bash-vue
 # Manually issue a ping request
-echo '{"path": ["ping"]}' | nc -U {{metadata.paths.socket}}
+echo '{"path": ["ping"], "terminal": {"is_tty": true, "color_depth": "16", "no_color": false}}' | nc -U {{metadata.paths.socket}}
 ```
 
 ---
 
-## Reserved System Namespace
+## Reserved System Commands
 
-The Engine contains a set of reserved commands that are always available, regardless of which plugins are loaded. Their routing keys are prefixed with `__sys_` to prevent collision with user-created plugin namespaces. These are dispatched inside `CommandRegistry` before the plugin routing table is ever consulted.
+The Engine contains built-ins that are always available, regardless of which plugins are loaded. These are dispatched before plugin routing.
 
-| Command Path    | Internal Handler | Purpose                                                                                                                           |
-| :-------------- | :--------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
-| `__sys_schema`  | `_sys_schema`    | Returns the full command hierarchy tree as a JSON object. Used exclusively by the Client on every boot to inflate its Cobra tree. |
-| `__sys_version` | `_sys_version`   | Returns the daemon's `APP_VERSION` string. Also aliased as `version`, `--version`, `-v`, `ver`.                                   |
-| `__sys_logs`    | `_sys_logs`      | Returns the last 30 lines of `$XDG_STATE_HOME/myctl/daemon.log`.                                                                  |
+| Command Path | Purpose                                                           |
+| :----------- | :---------------------------------------------------------------- |
+| `schema`     | Returns the full command hierarchy tree used by client hydration. |
+| `status`     | Returns daemon runtime status snapshot.                           |
+| `ping`       | Health check.                                                     |
+| `start`      | Start command semantics in daemon command layer.                  |
+| `restart`    | Restart command semantics.                                        |
+| `stop`       | Graceful daemon shutdown.                                         |
+| `sdk`        | SDK metadata and environment hints.                               |
+| `logs`       | Returns recent daemon log lines.                                  |
+| `help`       | Built-in help metadata.                                           |
 
 > [!IMPORTANT]
-> The `__sys_schema` path is a critical internal contract. The Client always requests `["__sys_schema"]` — it must never be re-assigned or overridden by a plugin. Because the shadowing mechanism operates only on the plugin-tier routing table (see [Plugin Discovery](plugin-discovery.md)), system handlers are structurally immutable.
+> The `schema` path is a critical internal contract. The Client requests `["schema"]` to build its command tree.
 
-The full set of system aliases (e.g., `stop`, `exit`, `quit`) are registered in the `_system_handlers` dictionary at `CommandRegistry.__init__`. Because these are keys in the top-level dispatch map, any plugin with a matching Plugin ID (e.g., a plugin folder named `stop/`) would shadow them. This is an intentional design allowing advanced users to override default behavior.
+System command names are reserved and handled before plugin dispatch.
 
 ---
 
@@ -148,7 +166,7 @@ Dial("unix", sockPath)
                         +--> BootstrapDaemon() --> Failure --> Fatal error
 ```
 
-The `allowBootstrap` flag determines whether a cold-boot is permitted. It is set to `false` for commands that should not trigger a daemon boot (`stop`, `status`) — these commands check if the daemon is alive without attempting to start it. All other user commands pass `allowBootstrap: true` via `executeDaemonCommand`.
+The `allowBootstrap` flag determines whether a cold-boot is permitted. It is set to `false` for commands that should not trigger a daemon boot (`stop`, `status`).
 
 > [!NOTE]
-> `myctl status` and `myctl stop` are special-cased in `main()`. Before the schema fetch, they call `fetchSchema(false)`. If the daemon is offline, they short-circuit and print a human-readable message (`"Daemon Status: offline"`) instead of triggering a cold boot. This prevents users from accidentally starting the daemon by checking its status.
+> `myctl status` and `myctl stop` are special-cased in `main()`. If daemon is offline, they return a friendly message without cold-booting.

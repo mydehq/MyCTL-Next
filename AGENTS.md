@@ -28,7 +28,7 @@ MyCTL is a high-performance Linux desktop controller built on a **Lean Client / 
 ### Core Components
 
 - **`cmd/` (Thin Client)**: The high-performance CLI entry point. Fetches JSON schema from daemon at runtime to build Cobra CLI tree; forwards all execution to Python via JSON-IPC.
-- **`daemon/` (Smart Server)**: Python 3.13+ namespaced package. Handles self-bootstrapping, N-level command routing, and native system integrations.
+- **`daemon/` (Smart Server)**: Python 3.14+ namespaced package. Handles self-bootstrapping, N-level command routing, and native system integrations.
 - **IPC**: Newline-delimited JSON over `$XDG_RUNTIME_DIR/myctl/myctld.sock`.
 
 ---

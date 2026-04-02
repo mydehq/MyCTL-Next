@@ -1,7 +1,7 @@
-from myctl.api import Plugin, Context, log
+from myctl.api import Context, Plugin, log
 from .src import handlers
 
-plugin = Plugin("sysinfo")
+plugin = Plugin()
 
 
 @plugin.on_load

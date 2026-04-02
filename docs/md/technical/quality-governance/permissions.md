@@ -71,5 +71,5 @@ Not implemented yet:
 ## Where to Track Progress
 
 - [Project Roadmap](../roadmap.md)
-- [Plugin Discovery](./plugin-discovery.md)
-- [Plugin Loading](./plugin-loading.md)
+- [Plugin Discovery](../plugin-system/plugin-discovery.md)
+- [Plugin Loading](../plugin-system/plugin-loading.md)

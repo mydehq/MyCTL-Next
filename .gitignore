@@ -23,10 +23,11 @@ build/lib
 .env
 .env.*
 
-# --- Logs & sockets ---
+# --- Logs & sockets  & artifacts ---
 *.log
 *.sock
 test*
+*legacy
 
 # --- IDE / OS ---
 .DS_Store

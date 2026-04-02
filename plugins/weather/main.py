@@ -1,7 +1,7 @@
-from myctl.api import Plugin, Context, log
+from myctl.api import Context, Plugin, log
 from .src.service import fetch_current_weather, fetch_forecast_weather
 
-plugin = Plugin("weather")
+plugin = Plugin()
 
 DEFAULT_CITY = "Kolkata"
 

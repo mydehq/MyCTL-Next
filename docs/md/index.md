@@ -37,5 +37,5 @@ features:
   - icon: "🍱"
     title: "No Dependency Hell"
     details: "Almost Zero system package deps. A fully sandboxed runtime keeps host system clean."
-    link: /technical/bootstrapping
+    link: /technical/core-runtime/bootstrapping
 ---

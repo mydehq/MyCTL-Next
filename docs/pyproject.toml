@@ -1,8 +1,8 @@
 [project]
-name = "plugin"
-authors = [{ name = "soymadip" }]
+name = "docs"
+authors = [{ name = "sllsls" }]
 version = "0.1.0"
-description = "MyCTL Official Plugin Manager"
+description = "slsjfsl"
 dependencies = []
 
 [tool.myctl]

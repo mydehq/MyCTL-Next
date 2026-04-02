@@ -32,17 +32,23 @@ On first run:
 
 ## Explore Built-in Commands
 
-MyCTL includes built-in commands for common system tasks. Try the audio commands:
+MyCTL includes built-in commands for common system tasks:
 
 ```bash
-# List all system audio outputs
-myctl audio sink list
+# Check daemon status
+myctl status
 
-# Mute your default speaker
-myctl audio sink mute
+# Restart daemon runtime
+myctl restart
 
-# Check the current service status
-myctl daemon status
+# Show current command schema
+myctl schema
+```
+
+Try a plugin command:
+
+```bash
+myctl audio status
 ```
 
 

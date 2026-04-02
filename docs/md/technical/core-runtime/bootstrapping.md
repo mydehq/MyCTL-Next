@@ -1,34 +1,35 @@
-# Bootstrapping: The UV Orchestration Layer
+# Bootstrapping: Managed Daemon Runtime
 
-MyCTL is designed with a **Managed Runtime Architecture**. Instead of relying on the host's system Python—which can be inconsistent across distributions—the Client uses [uv](https://docs.astral.sh/uv/) to orchestrate a deterministic, high-performance execution environment.
+MyCTL is designed with a **Managed Runtime Architecture**. Instead of relying on the host's system Python, the Client uses [uv](https://docs.astral.sh/uv/) to keep a deterministic daemon environment synchronized.
 
 ## 1. The Entry Point Handshake (Client)
 
 Every execution of `myctl` begins with a connection attempt to the Unix socket at `$XDG_RUNTIME_DIR/myctl/myctld.sock`. If the socket is unreachable, the Client enters the **Cold Boot Sequence**.
 
-### The `uv` Orchestrator
+### The Runtime Sequence
 
-The proxy verifies that `uv` is installed and then executes the daemon via:
+When the socket is unreachable, the Client does the following:
 
 ```sh
-uv run --project <daemon_root> python <daemon_script>
+uv sync --project <daemon_root>
+<managed_venv_python> -m myctld
 ```
 
-By leveraging `uv run`, MyCTL achieves:
+This gives MyCTL:
 
-- **Zero-Python Portability**: If `python3` isn't in the system path, `uv` will automatically download a managed Python version.
-- **Environment Isolation**: The runtime is strictly bound to `{{metadata.paths.venv}}` via the `UV_PROJECT_ENVIRONMENT` variable.
-- **Implicit Sync**: `uv` ensures all core dependencies (Pydantic, dbus-fast, etc.) are up-to-date before launching the server.
+- **Environment Isolation**: The runtime is bound to `{{metadata.paths.venv}}` via `UV_PROJECT_ENVIRONMENT`.
+- **Explicit Sync**: `uv sync` ensures dependencies are up-to-date before launch.
+- **Standalone Runtime Process**: the running daemon is `myctld` (not a long-lived `uv run` parent process).
 
 ### Orchestration Constraints
 
-The Client's daemon invocation sets a critical environment variable before spawning the process:
+The Client sets a critical environment variable before sync and launch:
 
 ```go
 cmd.Env = append(os.Environ(), fmt.Sprintf("UV_PROJECT_ENVIRONMENT=%s", venvPath))
 ```
 
-Where `venvPath` resolves to `$XDG_DATA_HOME/myctl/venv`. This `UV_PROJECT_ENVIRONMENT` override is what pins `uv run` to MyCTL's managed venv, preventing it from creating a new, transient environment in `/tmp`. This is a hard constraint: **the venv path is deterministic and user-scoped**. It must persist across invocations, as plugins install their dependencies into this location.
+Where `venvPath` resolves to `$XDG_DATA_HOME/myctl/venv`. This override pins all sync/launch actions to the managed venv. The venv path is deterministic and user-scoped.
 
 The daemon search path resolution follows this precedence:
 
@@ -45,7 +46,7 @@ To prevent race conditions where the CLI tries to send commands to a half-booted
 2.  **Initialize**: The Python engine loads the `CommandRegistry` and maps all available plugins.
 3.  **Bind**: The Asyncio server binds to the Unix socket (`asyncio.start_unix_server`).
 4.  **Signal**: Once the socket is ready to accept connections, the daemon flushes a unique token to stdout: `print("__DAEMON_READY__", flush=True)`.
-5.  **Unblock**: The Client intercepts this token, detaches the daemon process, and resumes the original user command.
+5.  **Unblock**: The Client intercepts this token and resumes the original user command.
 
 ### Handshake Internals
 
@@ -66,8 +67,8 @@ for scanner.Scan() {
 
 **Key mechanics:**
 
-- **Log Streaming**: Any line printed to stdout by `uv` during environment sync (e.g., dependency resolution messages) is forwarded to the user's terminal prefixed with `[myctl-boot]`. This gives developers real-time feedback during a first-run setup.
-- **Process Detachment (`go cmd.Wait()`)**: Once the ready signal is received, calling `go cmd.Wait()` in a goroutine detaches the daemon from the Client's foreground lifecycle. This is critical: without it, the daemon would become a zombie process once the Client exits. The goroutine absorbs the daemon's eventual exit status asynchronously, cleanly reclaiming OS resources. The daemon is then permanently adopted by the OS init system (PID 1).
+- **Readiness Gate**: Client bootstrap unblocks only after `__DAEMON_READY__` is observed.
+- **Output Channel Discipline**: readiness token uses stdout; structured logs are emitted to stderr (console) and file.
 - **Failure Detection**: If the daemon's stdout pipe closes before `__DAEMON_READY__` is seen — for example, due to a Python import error during startup — `scanner.Scan()` returns `false`, and the Client surfaces a `"daemon process terminated prematurely before ready signal"` error.
 
 ---
@@ -76,8 +77,10 @@ for scanner.Scan() {
 
 Once booted, the daemon remains in the background to handle future requests with $O(1)$ response times.
 
-- **Warm Boots**: Subsequent `myctl` commands connect directly to the existing socket, bypassing the `uv` check entirely for sub-millisecond execution.
+- **Warm Boots**: Subsequent `myctl` commands connect directly to the existing socket.
 - **Self-Healing**: If the daemon crashes or the socket is deleted, the very next `myctl` command will trigger the Cold Boot Sequence again automatically.
+- **Single-Instance Guard**: if a live daemon already owns the socket, a second daemon process is rejected.
+- **Clean Shutdown**: `myctl stop` and `SIGINT`/`SIGTERM` trigger graceful shutdown and socket cleanup.
 
 ---
 

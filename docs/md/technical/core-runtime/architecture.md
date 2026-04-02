@@ -28,7 +28,7 @@ Main files:
 
 ### 2. Daemon Layer (Python)
 
-Location: `daemon/myctl/core/`
+Location: `daemon/myctld/`
 
 - Runs continuously in background
 - Loads/discovers plugins
@@ -37,9 +37,9 @@ Location: `daemon/myctl/core/`
 
 Main files:
 
-- `daemon/myctl/core/app.py`
-- `daemon/myctl/core/ipc.py`
-- `daemon/myctl/core/registry.py`
+- `daemon/myctld/app.py`
+- `daemon/myctld/ipc.py`
+- `daemon/myctld/registry.py`
 
 ### 3. Plugin Layer
 
@@ -102,7 +102,7 @@ Plugin authors only touch Python plugin code; no Go client rebuild needed for ne
 ### Cold Boot
 
 - Daemon socket is missing/offline
-- Client starts daemon via `uv`
+- Client runs `uv sync`, then launches managed venv Python (`python -m myctld`)
 - After daemon signals ready, request proceeds
 
 See [Bootstrapping](./bootstrapping.md) for full lifecycle details.
@@ -127,7 +127,7 @@ See [Core Engine and Registry](./registry.md).
 
 Plugin ID is directory name, and package-context loading isolates imports.
 
-See [Plugin Loading](./plugin-loading.md) and [Plugin Discovery](./plugin-discovery.md).
+See [Plugin Loading](../plugin-system/plugin-loading.md) and [Plugin Discovery](../plugin-system/plugin-discovery.md).
 
 ---
 
@@ -155,3 +155,12 @@ MyCTL is designed to keep daemon alive even when individual plugins fail to load
 - Registry and plugins provide extensibility.
 - Package-context loading prevents plugin import collisions.
 - IPC keeps contract simple and observable.
+
+---
+
+## Current Command Semantics
+
+- `myctl start`: runs daemon in foreground (direct terminal attach).
+- `myctl start -b`: starts daemon in background via bootstrap path.
+- `myctl stop`: graceful daemon shutdown and socket cleanup.
+- `myctl logs`: reads recent daemon log lines.

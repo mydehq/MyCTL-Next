@@ -36,7 +36,7 @@ self._commands = {
 
 This structural mapping guarantees that executing a 5-level deep command takes precisely the same amount of time as a top-level command.
 
-Because `self._commands` is essentially a JSON-compatible tree, the daemon can manifest its entire internal state via the `__sys_schema` command. The Client fetches this JSON on every boot and uses it to "inflate" its command tree, ensuring the client and server are always in perfect sync without manual re-compilation.
+Because the command tree is JSON-compatible, the daemon can manifest its internal state via the `schema` command. The Client fetches this JSON on boot and uses it to inflate its command tree.
 
 ### Tree Inflation Algorithm (`add_cmd`)
 
@@ -82,7 +82,7 @@ Group metadata (help text) is applied _after_ all `add_cmd` registrations during
 Flags are registered alongside commands via the `@plugin.flag` decorator. The SDK normalizes these flags (adding prefixes, hyphenating names, and inferring types) before they are stored in the registry's command tree.
 
 The `flags` list in a command node contains objects used by the system for:
-1.  **Schema Generation**: The `__sys_schema` command exports these flags to the Go client for CLI generation.
+1.  **Schema Generation**: The `schema` command exports these flags to the Go client for CLI generation.
 2.  **Argparse Pre-parsing**: The `dispatch` method uses this metadata to construct an internal `argparse.ArgumentParser` that validates and extracts flag values from `ctx.args` before the handler is executed.
 
 ```python

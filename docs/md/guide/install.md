@@ -41,7 +41,19 @@ uv --version
 After building, run a command to start MyCTL and verify the environment:
 
 ```bash
+./bin/myctl ping
+```
+
+Foreground daemon run (attached to current terminal):
+
+```bash
 ./bin/myctl start
+```
+
+Background daemon run (detached):
+
+```bash
+./bin/myctl start -b
 ```
 
 If you want to use the local binary directly, add `./bin` to your shell `PATH`.

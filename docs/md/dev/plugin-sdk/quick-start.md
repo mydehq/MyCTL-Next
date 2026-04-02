@@ -95,7 +95,7 @@ If you used `myctl plugin init`, this skeleton is already generated. You can now
 from myctl.api import Plugin, Context
 from .src.commands import hello_message
 
-plugin = Plugin("myplugin")
+plugin = Plugin()
 
 @plugin.command(path="hello", help="Confirm myplugin is working")
 async def hello(ctx: Context):
@@ -112,7 +112,7 @@ def hello_message() -> str:
 ## 5. Configure IDE SDK Support
 
 ```bash
-myctl sdk setup
+myctl sdk
 ```
 
 This configures IDE import resolution for `myctl.api` autocompletion and type hints.

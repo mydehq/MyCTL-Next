@@ -8,7 +8,7 @@ export const metadata = {
 
   // 📦 Versions & Requirements
   versions: {
-    python_min: "3.13+",
+    python_min: "3.14+",
     api_ver: "2.5.0",
   },
 
