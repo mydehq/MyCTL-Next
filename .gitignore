@@ -29,6 +29,11 @@ build/lib
 test*
 *legacy
 
+# keep daemon test harness tracked
+!daemon/tests
+!daemon/tests/**
+daemon/tests/__pycache__
+
 # --- IDE / OS ---
 .DS_Store
 ...*

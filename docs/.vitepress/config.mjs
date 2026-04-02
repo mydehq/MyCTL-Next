@@ -70,6 +70,7 @@ export default withMermaid({
               { text: "API Reference", link: "/dev/plugin-sdk/api" },
             ],
           },
+          { text: "Daemon Commands", link: "/dev/daemon-commands" },
           { text: "Client API (IPC)", link: "/dev/client-api" },
         ],
       },
@@ -78,7 +79,6 @@ export default withMermaid({
         collapsed: false,
         items: [
           { text: "Overview", link: "/technical/overview" },
-          { text: "Refactor", link: "/technical/daemon-architecture-vision" },
           {
             text: "Core Runtime",
             collapsed: true,
@@ -86,6 +86,7 @@ export default withMermaid({
               { text: "System Architecture", link: "/technical/core-runtime/architecture" },
               { text: "Bootstrapping", link: "/technical/core-runtime/bootstrapping" },
               { text: "IPC Protocol", link: "/technical/core-runtime/ipc-protocol" },
+              { text: "Request Context & Logging", link: "/technical/core-runtime/request-context" },
               { text: "Core Engine & Registry", link: "/technical/core-runtime/registry" },
             ],
           },

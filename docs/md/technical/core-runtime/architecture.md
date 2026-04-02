@@ -2,7 +2,9 @@
 
 ## Goal
 
-MyCTL is designed to keep command execution fast while allowing dynamic plugin-based behavior.
+MyCTL is designed to keep command execution fast while still allowing dynamic plugin-based behavior.
+
+If you are new to the codebase, keep one mental model in mind: the Go client is the front door, the Python daemon is the worker, and plugins add commands to the worker at runtime.
 
 It does this with a **lean client + persistent daemon** model:
 
@@ -17,9 +19,11 @@ It does this with a **lean client + persistent daemon** model:
 
 Location: `cmd/`
 
-- Builds CLI surface from daemon-provided schema
-- Sends command requests over Unix socket
+- Builds the CLI surface from daemon-provided schema
+- Sends command requests over a Unix socket
 - Handles daemon bootstrap when needed
+
+The client is intentionally small. It does not implement command logic itself.
 
 Main files:
 
@@ -30,10 +34,12 @@ Main files:
 
 Location: `daemon/myctld/`
 
-- Runs continuously in background
-- Loads/discovers plugins
+- Runs continuously in the background
+- Loads and discovers plugins
 - Dispatches command handlers
 - Returns NDJSON responses
+
+The daemon owns the real behavior of MyCTL.
 
 Main files:
 
@@ -45,9 +51,11 @@ Main files:
 
 Location: `plugins/` (plus user/system plugin paths)
 
-- Extends command tree
+- Extends the command tree
 - Registers commands via SDK decorators
 - Keeps implementation in `src/`
+
+Plugins are runtime extensions, not separate applications.
 
 ---
 
@@ -74,6 +82,8 @@ Step-by-step:
 5. Daemon returns status/data/exit code.
 6. Client prints output and exits.
 
+If the daemon is already running, this flow is just one socket round trip plus handler execution.
+
 ---
 
 ## Why This Split Exists
@@ -89,6 +99,8 @@ The daemon can discover plugin commands at runtime, so command surface is not ha
 ### Better Extensibility
 
 Plugin authors only touch Python plugin code; no Go client rebuild needed for new plugin commands.
+
+That keeps the client stable and moves feature growth into the daemon and plugin layers.
 
 ---
 

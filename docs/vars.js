@@ -13,11 +13,12 @@ export const metadata = {
   },
 
   // 🏗 Infrastructure Paths
+  // Use shared constants: APP_NAME=myctl, DAEMON_NAME=myctld.
   paths: {
     venv: "$XDG_DATA_HOME/myctl/venv",
     plugins: "$XDG_DATA_HOME/myctl/plugins",
-    socket: "$XDG_RUNTIME_DIR/myctl/myctld.sock",
-    logs: "$XDG_STATE_HOME/myctl/daemon.log",
+    socket: "$XDG_RUNTIME_DIR/myctl/myctld.sock", // daemon socket
+    logs: "$XDG_STATE_HOME/myctl/myctld.log", // daemon log file
   },
 
   // 🛠 Tools & Ecosystem

@@ -97,7 +97,7 @@ from .src.commands import hello_message
 
 plugin = Plugin()
 
-@plugin.command(path="hello", help="Confirm myplugin is working")
+@plugin.command("hello", help="Confirm myplugin is working")
 async def hello(ctx: Context):
     return ctx.ok(hello_message())
 ```

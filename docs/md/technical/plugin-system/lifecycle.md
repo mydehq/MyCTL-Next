@@ -1,98 +1,156 @@
-# Lifecycle: Plugin State and Recovery
+# Plugin Lifecycle
 
-The MyCTL daemon treats plugins as transient logic blocks operating within a persistent host process. To ensure the daemon remains stable even when executing poorly written or failing plugins, it orchestrates a rigid, sandbox-driven lifecycle.
+This page explains what happens to a plugin after discovery and before it becomes active in the daemon.
 
-This document details the distinct execution phases a plugin undergoes and the error-recovery mechanisms that protect the Engine.
+The lifecycle is a state machine with three important jobs:
 
----
-
-## 1. The Plugin Lifecycle Phases
-
-Every plugin, upon discovery, transitions through sequential initialization phases. A failure at any phase aborts the sequence, triggering an immediate rollback.
-
-### Phase 1: Discovery & Validation
-
-Before any code is ever imported, the Engine validates the structural integrity of the plugin via `pyproject.toml`.
-
-- **Identity Check**: The `project.name` must exactly match the physical directory name. If there is a mismatch, the plugin is rejected to prevent obscure routing bugs.
-- **API Parity**: The plugin's declared `tool.myctl.api_version` is compared against the Engine's `API_VERSION`. Major version mismatches instantly halt the load process.
-
-### Phase 2: Dependency Synchronization (`uv`)
-
-If the validation succeeds and the plugin declares `dependencies` in its manifest, the Engine halts execution and forks out to `uv pip install`.
-
-- The plugin's directory is passed directly into `uv`, which parses the `pyproject.toml` and installs the required packages into the central, locked `$XDG_DATA_HOME/myctl/venv`.
-- This phase shields the Python environment from being mutated by random `subprocess` calls within a plugin.
-
-### Phase 3: Module Load & Initialization
-
-The final and most sensitive phase is the actual dynamic execution of the `main.py` entry point.
-
-1.  **Namespace Package Creation**: The Engine creates `myctl_plugins.<plugin_id>` and loads `main.py` as a submodule in that namespace.
-2.  **Decorator Registration**: The plugin instance (`plugin = Plugin("<id>")`) exposes `@plugin.command`, `@plugin.flag`, `@plugin.on_load`, and `@plugin.periodic` metadata.
-3.  **The `on_load` Execution**: The Engine executes registered `on_load` hooks sequentially.
-
-### Phase 4: Background Runtime
-
-Upon a successful `on_load`, the plugin is considered "Active" and the daemon resumes its standard operation.
-
-- Action handlers (`@plugin.command`) only sit idle in memory until dispatched by IPC.
-- Background tasks (`@plugin.periodic`) are extracted and passed to the `asyncio` event loop.
+- isolate plugin initialization
+- reject broken plugins without crashing the daemon
+- keep background tasks alive without killing the event loop
 
 ---
 
-## 2. Fail-Fast Rollback Mechanism
+## 1. Lifecycle States
 
-The `on_load` function acts as a definitive health check. If a plugin's setup logic raises an unhandled exception, the `"Fail-Fast"` recovery sequence activates:
+The daemon treats a plugin as moving through these states:
 
-```python
-plugin_failed = False
-for hook in plugin_instance._load_hooks:
-    try:
-        await hook(ctx)  # or hook() when no context param is declared
-    except Exception as e:
-        logging.error(f"Plugin '{plugin_id}' critical initialization failure: {e}")
-        plugin_failed = True
-        break
+1. discovered
+2. validated
+3. dependency-synced
+4. imported
+5. initialized
+6. active
 
-if plugin_failed:
-    logging.critical(f"REJECTED plugin '{plugin_id}': Failed initialization. Rolling back.")
-    # Safe Rollback
-    del self._commands[plugin_id]
-```
+If any step fails, the plugin stops moving forward and is rejected.
 
-By safely deleting the `plugin_id` root from the `_commands` routing table, the daemon essentially pretends the plugin never existed. The process remains running, and other CLI commands function normally.
+The daemon itself stays up.
 
 ---
 
-## 3. Background Task Resilience (`_periodic_wrapper`)
+## 2. Discovery And Validation
 
-While a plugin failing to load is cleanly rejected, a plugin failing _during_ a background `@plugin.periodic` task poses a threat to the asynchronous architecture.
+Discovery decides whether a plugin candidate should be considered.
 
-To prevent a bad `while True:` loop or network timeout from terminating the daemon or silently exiting an `asyncio.Task`, the Engine wraps every background job in a resilient boundary:
+Validation checks that the candidate is structurally safe to load.
 
-```python
-async def _periodic_wrapper(self, interval: int, func: Callable):
-    """Infinite loop for a background task with retry logic"""
-    while True:
-        try:
-            await asyncio.sleep(interval)
+The daemon verifies:
 
-            # Execute the user's plugin logic
-            if asyncio.iscoroutinefunction(func):
-                await func()
-            else:
-                func()
+- the folder exists
+- `pyproject.toml` exists
+- the directory name matches `[project].name`
+- the declared API compatibility is acceptable
 
-        except Exception as e:
-            # Trap the error to keep the loop and task alive
-            logging.error(
-                f"Background task '{func.__name__}' ({interval}s) failed: {e}. "
-                f"Retrying in {interval}s..."
-            )
-```
+This keeps invalid plugins out of the loader.
 
-**Key Advantages:**
+---
 
-- **Zero-Crash Guarantee**: The `try...except Exception as e` acts as a global catch-all. An individual plugin's periodic loop can fail continuously without degrading daemon performance or killing the event loop.
-- **Cool-Down Wait**: Because the `await asyncio.sleep(interval)` is located at the top of the `while` loop (before the logic executes), failing tasks inherently wait their designated interval before retrying, preventing unbounded CPU spin-locking if a task crashes immediately upon starting.
+## 3. Dependency Sync
+
+If a plugin declares dependencies, the daemon syncs them before import.
+
+This step exists so plugin code can rely on its own declared runtime dependencies without mutating the daemon environment manually.
+
+The plugin is not considered loaded until dependency sync succeeds.
+
+---
+
+## 4. Import And Registration
+
+Once dependencies are ready, the daemon imports the plugin’s entry module in its own namespace.
+
+That import does three things:
+
+- executes top-level registration code
+- attaches command and flag metadata from decorators
+- prepares lifecycle hooks such as `on_load` and `periodic`
+
+The important detail is that the plugin is still not active until initialization hooks finish.
+
+---
+
+## 5. On-Load Initialization
+
+`on_load` hooks are the plugin’s startup check.
+
+The daemon runs them sequentially so a failure in one hook can stop initialization immediately.
+
+If a hook raises an exception, the plugin is rejected and its registration is rolled back.
+
+That rollback keeps the plugin from appearing partially loaded in the runtime registry.
+
+---
+
+## 6. Active State
+
+After successful initialization, the plugin becomes active.
+
+At that point:
+
+- command handlers remain in memory until dispatch time
+- the registry can route requests to the plugin’s handlers
+- periodic background jobs may run in the event loop
+
+The plugin is now part of the daemon’s live command set.
+
+---
+
+## 7. Periodic Tasks
+
+Periodic tasks are background loops managed by the daemon.
+
+They are wrapped so that one failing iteration does not terminate the task permanently or crash the daemon.
+
+The important behavior is:
+
+- sleep between iterations
+- execute the task
+- catch and log exceptions
+- continue the loop after failure
+
+That makes periodic tasks resilient even when plugin code is noisy or unstable.
+
+---
+
+## 8. Failure Handling
+
+Plugin failures are contained.
+
+There are two common failure points:
+
+- initialization failure during `on_load`
+- runtime failure inside a periodic task
+
+Initialization failure means the plugin is rejected.
+Periodic task failure means the task logs the error and keeps looping.
+
+The daemon should keep serving other plugins and commands either way.
+
+---
+
+## 9. What Lifecycle Does Not Do
+
+Lifecycle does not handle:
+
+- discovery tier scanning
+- schema building
+- command dispatch
+- CLI rendering
+
+Those concerns belong to discovery, registry, and client layers.
+
+---
+
+## 10. Summary
+
+Plugin lifecycle is the part of the daemon that turns a validated importable plugin into an active runtime participant.
+
+The flow is:
+
+- discover
+- validate
+- sync dependencies
+- import
+- initialize
+- activate
+
+Failures are isolated to the plugin that caused them.

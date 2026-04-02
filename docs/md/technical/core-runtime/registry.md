@@ -1,72 +1,57 @@
-# Command Registry: The O(1) Routing Engine
+# Core Engine & Registry
 
-To maintain sub-millisecond execution times, the MyCTL daemon utilizes a specialized `CommandRegistry` that caches every available feature into an **$O(1)$ resolvable memory map**.
+This page explains how MyCTL routes commands internally.
 
-The registry acts as the central link between the isolated plugin sandboxes and the IPC server loop, holding direct references to Python function pointers for instant dispatch.
+The registry is the daemon’s command router and schema source of truth. It does two jobs:
+
+- resolve an incoming command path to the correct handler
+- build the command tree that the client uses to render CLI help
+
+The important part is that those two jobs are separate. Dispatch is for runtime. Schema is for client UI.
 
 ---
 
-## 1. The N-Level Memory Tree
+## 1. What The Registry Stores
 
-Command dispatch speed must be independent of its depth. Regular expressions or sequential string scanning are too expensive for a real-time system controller.
+At runtime the daemon keeps two command sources in memory:
 
-The `CommandRegistry` bypasses these costs by converting command paths (e.g., `audio volume set`) into a deeply nested Python dictionary structure during the discovery phase:
+- built-in daemon commands from `daemon/myctld/syscmds/`
+- plugin commands discovered from loaded plugins
+
+Built-in commands are registered through decorator metadata in `daemon/myctld/syscmds/registry.py`.
+Plugin commands are registered through `myctl.api` metadata.
+
+The registry does not care where the metadata came from. It only cares about the final normalized shape:
+
+- command path
+- help text
+- flag metadata
+- handler callable
+- owning namespace
+
+That makes the registry the shared runtime boundary between daemon internals and plugin code.
+
+---
+
+## 2. Command Tree Shape
+
+The client-facing command tree is nested.
+
+A path like `audio volume set` becomes a structure like this:
 
 ```python
-self._commands = {
+{
     "audio": {
         "type": "group",
-        "help": "System audio controls",
         "children": {
             "volume": {
                 "type": "group",
-                "help": "Volume adjustment",
                 "children": {
                     "set": {
                         "type": "command",
-                        "help": "Set volume (0-100)",
-                        "handler": <function_pointer_at_0x7f...>
-                    }
-                }
-            }
-        }
-    }
-}
-```
-
-This structural mapping guarantees that executing a 5-level deep command takes precisely the same amount of time as a top-level command.
-
-Because the command tree is JSON-compatible, the daemon can manifest its internal state via the `schema` command. The Client fetches this JSON on boot and uses it to inflate its command tree.
-
-### Tree Inflation Algorithm (`add_cmd`)
-
-During the plugin discovery phase, each call to `@plugin.command` contributes metadata captured by the plugin instance. The registry iterates those handlers and invokes `CommandRegistry.add_cmd` to build the nested dictionary hierarchy incrementally, inserting nodes one at a time.
-
-The algorithm works as follows:
-
-1. **Ensure Root Group**: If the `plugin_id` (e.g., `"audio"`) does not yet have an entry in `self._commands`, a root group node is created.
-2. **Tokenize Path**: The command path string (e.g., `"volume set"`) is split by whitespace into a list of segments: `["volume", "set"]`.
-3. **Traverse and Grow**: The algorithm iterates over each segment, descending into the `children` map. If a segment does not exist, a new node is created:
-   - **Intermediate segments** → create a `"group"` node with an empty `children` dict.
-   - **Final segment** → create a `"command"` node with the resolved `help` string and the direct Python function pointer `handler`.
-4. **Overwrite Prevention**: Because the check `if part not in current["children"]` is used, re-registering the same path is a no-op. The first registration wins. This is consistent with the Total Override Rule at the tier level.
-
-```python
-# Simplified trace: add_cmd("audio", "volume set", set_handler, "Set volume")
-#
-# Before: self._commands = {}
-# After:
-self._commands = {
-    "audio": {
-        "type": "group",
-        "children": {
-            "volume": {
-                "type": "group",        # intermediate: created automatically
-                "children": {
-                    "set": {
-                        "type": "command",
-                        "handler": <set_handler>,
                         "help": "Set volume",
+                        "flags": [...],
+                        "handler": <callable>,
                     }
                 }
             }
@@ -75,70 +60,206 @@ self._commands = {
 }
 ```
 
-Group metadata (help text) is applied _after_ all `add_cmd` registrations during `discover()`, using the `groups` table from `pyproject.toml`'s `[tool.myctl]` section. This two-pass approach allows the manifest to document groups that may not yet exist when the plugin's `main.py` begins executing.
+That same shape is used for:
 
-### Flag Metadata
+- daemon commands such as `status` and `schema`
+- plugin commands such as `audio volume set`
 
-Flags are registered alongside commands via the `@plugin.flag` decorator. The SDK normalizes these flags (adding prefixes, hyphenating names, and inferring types) before they are stored in the registry's command tree.
-
-The `flags` list in a command node contains objects used by the system for:
-1.  **Schema Generation**: The `schema` command exports these flags to the Go client for CLI generation.
-2.  **Argparse Pre-parsing**: The `dispatch` method uses this metadata to construct an internal `argparse.ArgumentParser` that validates and extracts flag values from `ctx.args` before the handler is executed.
-
-```python
-# Internal flag metadata structure
-{
-    "name": "--output-format",
-    "short": "-f",
-    "type": "str",
-    "default": "text",
-    "required": False,
-    "help": "Set output format"
-}
-```
+The tree is built from metadata, not from hardcoded command lists.
 
 ---
 
-## 2. Dispatch & Execution Flow
+## 3. Schema Building
 
-When a user executes `myctl audio volume set 50`, the Client tokenizes the path and passes `["audio", "volume", "set"]` to the daemon over IPC.
+Schema building now lives in `daemon/myctld/schema.py`.
 
-The Registry executes the dispatch in two sub-millisecond steps:
+The registry asks the builder to turn runtime command metadata into a JSON-serializable tree.
 
-1.  **Traversal**: The engine uses the tokenized array to recursively descend the `children` map.
-2.  **Execution**: Once it reaches the leaf node (the `"command"` type), it captures the `handler` pointer and executes it.
+The builder is responsible for:
 
-```python
-# Conceptual dispatch logic
-current = self._commands[path[0]]
-for segment in path[1:]:
-    current = current["children"][segment]
+- splitting command paths into segments
+- creating group nodes for intermediate segments
+- attaching flag metadata to leaf commands
+- combining built-in commands and plugin commands into one tree
 
-# Await the execution of the isolated plugin logic
-await current["handler"](ctx)
-```
+The registry is only responsible for handing the builder the current runtime state.
 
-By strictly utilizing memory pointers rather than string-based evaluation, the core routing loop achieves native execution speed, moving from the network socket to the function logic in microseconds.
+This is why `schema()` is cheap to reason about:
 
-### Path Resolution Strategy
+- no dispatch logic
+- no plugin lifecycle logic
+- no path traversal logic beyond tree assembly
 
-The actual `dispatch` method in `CommandRegistry` has an important subtlety: it must determine not only _which_ handler to invoke, but also which portion of the context `path` array represents the command route vs. the user-supplied arguments.
+---
 
-The resolver uses an `args_start_idx` cursor that advances as each tree segment is matched:
+## 4. Dispatch Flow
 
-```python
-current = self._commands[plugin_id]    # Start at the plugin root node
-args_start_idx = 1
+Dispatch is the runtime fast path.
 
-for i in range(1, len(ctx.path)):
-    part = ctx.path[i]
-    if "children" in current and part in current["children"]:
-        current = current["children"][part]  # Descend the tree
-        args_start_idx = i + 1              # Advance cursor past matched segment
-    else:
-        break                               # Unknown segment = start of user args
-```
+When a user runs a command, the daemon already has the request context, command path, and flag values. The registry then looks for the handler in this order:
 
-After traversal, `ctx.args` is sliced from `args_start_idx` onward. This allows a command registered as `"volume set"` to correctly receive `["50"]` in its `ctx.args` when the user runs `myctl audio volume set 50`, even though the original `ctx.path` was `["audio", "volume", "set", "50"]`.
+1. built-in daemon commands
+2. plugin command tree
+3. fallback help or error response if nothing matches
 
-If traversal terminates on a `"group"` node (i.e., the user didn't provide a full command path), the daemon returns an `err()` response with the group's help text, which the Cobra client then renders as a formatted help page.
+For built-ins, the registry checks the longest matching path first. That means both single-word and nested daemon commands work:
+
+- `status`
+- `schema`
+- `plugin reload`
+- `sdk setup`
+
+The dispatcher does not rebuild the schema during execution. It uses the stored runtime tables directly.
+
+That keeps command execution focused on one job: find the handler and run it.
+
+---
+
+## 5. Built-In Commands
+
+Built-in commands live in `daemon/myctld/syscmds/`.
+
+The flow is:
+
+- `daemon/myctld/syscmds/__init__.py` auto-imports command modules
+- command decorators in `daemon/myctld/syscmds/api.py` attach metadata
+- `daemon/myctld/syscmds/registry.py` stores the normalized handler information
+- the registry reads that data during dispatch and schema generation
+
+Built-ins are part of the daemon itself, so they can import `myctld` internals directly.
+
+That means a built-in command can use:
+
+- config helpers
+- logging helpers
+- plugin manager state
+- IPC helpers
+- runtime services
+
+The internal command API exists to keep the authoring style clean, not to restrict access.
+
+---
+
+## 6. Plugin Commands
+
+Plugins contribute to the same registry shape, but through the public SDK.
+
+The plugin side still uses:
+
+- `Plugin()`
+- `@plugin.command(...)`
+- `@plugin.flag(...)`
+- `@plugin.flags([...])`
+- `Context`
+- `Response`
+
+The registry sees plugin commands and built-in commands as the same kind of runtime object once they are normalized.
+
+That is why the command tree can merge both sources without special cases in the client.
+
+---
+
+## 7. Flags
+
+Flags are stored alongside the command they belong to.
+
+That allows the registry to use the same metadata for:
+
+- CLI help generation
+- pre-validation
+- request dispatch
+- schema output
+
+A leaf command node contains the command handler and its flags. A group node only contains children.
+
+This is why commands like `plugin reload` or `logs --level info` can expose clean help text without the dispatcher needing to know command-specific parsing rules.
+
+---
+
+## 8. Why Schema And Dispatch Stay Separate
+
+The original registry design mixed tree building and request execution. That made the code harder to understand and harder to test.
+
+The current split is better because:
+
+- schema building can be tested without live requests
+- dispatch can be tested without rebuilding the tree
+- changes to CLI structure do not affect runtime routing
+- the registry module stays focused on orchestration
+
+In practice, that means:
+
+- `schema.py` answers: “what commands exist?”
+- `registry.py` answers: “which handler should run now?”
+
+---
+
+## 9. What Happens On `myctl schema`
+
+When the client asks for schema, the daemon:
+
+1. collects built-in command metadata
+2. collects plugin metadata
+3. passes both into the schema builder
+4. returns the merged tree to the client
+
+The client then uses that tree to render help and inflate its command UI.
+
+That is why schema generation is part of the runtime contract, not just a debugging feature.
+
+---
+
+## 10. What Happens On A Normal Command
+
+When the client runs a real command, the daemon skips schema building and goes straight to routing.
+
+Example flow:
+
+1. client sends `myctl plugin reload audio`
+2. daemon builds `Context`
+3. registry resolves `plugin reload`
+4. handler receives `ctx` and the runtime registry
+5. handler returns a `Response`
+6. daemon sends the normalized result back to the client
+
+The registry does not need to inspect command source files at this point. It already has the registered metadata in memory.
+
+---
+
+## 11. Command Source Of Truth
+
+The source of truth is the runtime metadata, not a manifest file and not a hand-written command table.
+
+For built-ins, the metadata is attached through the syscommand decorators.
+For plugins, the metadata is attached through the plugin SDK decorators.
+
+That keeps the command system uniform without making built-ins behave like plugins at runtime.
+
+---
+
+## 12. Practical Mental Model
+
+A useful way to think about the registry is:
+
+- command modules define behavior
+- decorators capture metadata
+- the registry normalizes and stores that metadata
+- schema builder renders the tree
+- dispatcher executes the right handler
+
+If you keep that split in mind, the implementation stays easy to reason about.
+
+---
+
+## 13. Summary
+
+The registry is the daemon’s routing core.
+
+It connects:
+
+- built-in daemon commands
+- plugin commands
+- schema generation
+- request dispatch
+
+The design is intentionally simple: one metadata model, two runtimes, one router.

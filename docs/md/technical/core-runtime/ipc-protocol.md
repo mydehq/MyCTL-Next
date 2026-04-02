@@ -1,10 +1,16 @@
 # IPC Protocol: The NDJSON Handshake
 
-MyCTL uses a lightweight, high-performance protocol based on **Newline-Delimited JSON (NDJSON)** over a native Unix Domain Socket. This protocol serves as the vital bridge between the agnostic Client and the persistent Python Engine.
+MyCTL uses a lightweight protocol based on **Newline-Delimited JSON (NDJSON)** over a Unix domain socket.
+
+NDJSON means one JSON object per line. That makes the protocol easy to parse and easy to debug by hand.
+
+This protocol is the bridge between the Go client and the persistent Python daemon.
 
 ## Why NDJSON?
 
 In traditional socket programming, clients and servers must often implement complex framing (like HTTP `Content-Length`) to know exactly when a message ends. NDJSON simplifies this by guaranteeing that exactly one JSON object exists per line.
+
+For MyCTL, that means the client can read a response line, decode it, and exit without keeping a large buffer around.
 
 This enables the Client to achieve $O(1)$ parsing speed. It never manages streaming memory buffers; it simply reads until the newline character (`\n`):
 
@@ -21,9 +27,13 @@ Once the newline is reached, the Client unmarshals the payload, renders the outp
 
 The communication between the client and server relies on strict structural payloads that map directly between Go and Python.
 
+The request always describes the command path and execution context. The response always describes the result.
+
 ### 1. The Request Payload
 
 The Client sends exactly one JSON object per command containing the context required for Python to resolve the command hierarchy.
+
+Think of this as: “here is the command the user typed, plus the environment needed to run it correctly.”
 
 **Client Request Structure**:
 
@@ -63,9 +73,13 @@ type Request struct {
 > [!IMPORTANT]
 > The `terminal` block is required for all command requests. It is the source of truth for rendering decisions and replaces the old env-based capability guessing logic.
 
+That avoids guessing whether the user is in a real terminal, a pipe, or an editor task.
+
 ### 2. The Response Payload (Python -> Client)
 
 The Python engine executes the handler and responds with exactly one JSON object.
+
+The client does not keep server state between responses. It just reads one line, acts on it, and exits.
 
 **Go Struct (`cmd/main.go`)**:
 
@@ -99,6 +113,8 @@ The MyCTL client natively supports multi-turn IPC communication without bufferin
 5. The client continues reading from the socket recursively, waiting for a final `0` (`OK`), `1` (`ERROR`), or another `2` (`ASK`).
 
 This guarantees typical non-interactive commands execute at pure $O(1)$ networking latency, whilst still supporting deep plugin interactivity.
+
+In practice, that means a plugin can ask follow-up questions without switching protocols or opening a second socket.
 
 ---
 

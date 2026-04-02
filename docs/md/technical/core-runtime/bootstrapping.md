@@ -1,10 +1,17 @@
 # Bootstrapping: Managed Daemon Runtime
 
-MyCTL is designed with a **Managed Runtime Architecture**. Instead of relying on the host's system Python, the Client uses [uv](https://docs.astral.sh/uv/) to keep a deterministic daemon environment synchronized.
+MyCTL is designed with a managed runtime architecture. Instead of relying on the host's system Python, the client uses [uv](https://docs.astral.sh/uv/) to keep the daemon environment synchronized.
+
+In plain terms, bootstrapping means: if the daemon is not running yet, the client starts it in a controlled Python environment and waits until it is ready to answer requests.
 
 ## 1. The Entry Point Handshake (Client)
 
 Every execution of `myctl` begins with a connection attempt to the Unix socket at `$XDG_RUNTIME_DIR/myctl/myctld.sock`. If the socket is unreachable, the Client enters the **Cold Boot Sequence**.
+
+This is the difference between a warm run and a cold boot:
+
+- warm run: the daemon already exists, so the client connects immediately
+- cold boot: the daemon is missing, so the client starts it first
 
 ### The Runtime Sequence
 
@@ -31,6 +38,8 @@ cmd.Env = append(os.Environ(), fmt.Sprintf("UV_PROJECT_ENVIRONMENT=%s", venvPath
 
 Where `venvPath` resolves to `$XDG_DATA_HOME/myctl/venv`. This override pins all sync/launch actions to the managed venv. The venv path is deterministic and user-scoped.
 
+That makes the daemon environment predictable even when the user has many other Python installations on the machine.
+
 The daemon search path resolution follows this precedence:
 
 1. **Development (relative)**: At build time, `runtime.Caller(0)` resolves the path of `daemon.go`, and `daemonRoot` is derived two directories up from it — pointing to the project's `daemon/` folder.
@@ -41,6 +50,8 @@ The daemon search path resolution follows this precedence:
 ## 2. Handshake Protocol (`__DAEMON_READY__`)
 
 To prevent race conditions where the CLI tries to send commands to a half-booted server, MyCTL utilizes a safe stdout handshake.
+
+The idea is simple: the daemon prints one known token only after it has finished binding the socket and is ready to serve requests.
 
 1.  **Block**: The Client opens a pipe to the daemon's stdout and blocks.
 2.  **Initialize**: The Python engine loads the `CommandRegistry` and maps all available plugins.
@@ -81,6 +92,8 @@ Once booted, the daemon remains in the background to handle future requests with
 - **Self-Healing**: If the daemon crashes or the socket is deleted, the very next `myctl` command will trigger the Cold Boot Sequence again automatically.
 - **Single-Instance Guard**: if a live daemon already owns the socket, a second daemon process is rejected.
 - **Clean Shutdown**: `myctl stop` and `SIGINT`/`SIGTERM` trigger graceful shutdown and socket cleanup.
+
+The daemon is meant to stay alive across many client invocations, not to restart for every command.
 
 ---
 

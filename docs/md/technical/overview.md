@@ -1,23 +1,23 @@
 # Technical Overview
 
-## Who This Section Is For
+## Read This Section
 
-This technical section is for developers with beginner-to-mid Python/Go experience who want to understand how MyCTL works internally.
+Read these pages from top to bottom. Each page builds on the previous one and follows the same runtime path the daemon uses.
 
-You do not need to know every low-level detail before contributing. Start with the pages below in order.
+If a term appears before it is defined, the next page should explain it in context.
 
 ---
 
 ## How MyCTL Works in One Minute
 
-MyCTL is a split system:
+MyCTL is a split system with three parts:
 
-1. A thin Go client receives your command.
+1. A thin Go client receives the command.
 2. It sends the request over a Unix socket.
 3. A persistent Python daemon routes and executes the command.
-4. Response is returned as NDJSON.
+4. The daemon returns the response as NDJSON, one JSON object per line.
 
-This design keeps the CLI fast while allowing rich plugin behavior.
+That is the basic data flow for every command in the system.
 
 ```mermaid
 sequenceDiagram
@@ -34,25 +34,19 @@ sequenceDiagram
 
 ---
 
-## Suggested Reading Order
+## How To Read This Section
 
-### 1) Core Runtime
+Use the sidebar as the map. This page is the entry point and the reading order.
 
-- [System Architecture](./core-runtime/architecture): End-to-end design and responsibilities.
-- [Bootstrapping](./core-runtime/bootstrapping): How daemon startup and cold boot work.
-- [IPC Protocol](./core-runtime/ipc-protocol): Request/response format and command transport.
-- [Core Engine and Registry](./core-runtime/registry): How commands are stored and dispatched.
+Each subsection explains one stage of the runtime path:
 
-### 2) Plugin System
+### Start Here
 
-- [Plugin Loading](./plugin-system/plugin-loading): Namespaced loading model and import safety.
-- [Plugin Discovery](./plugin-system/plugin-discovery): Tiered paths and plugin shadowing rules.
-- [Plugin Lifecycle](./plugin-system/lifecycle): Load hooks, periodic tasks, and failure handling.
+- **Core Runtime**: startup, bootstrapping, IPC, request context, and routing.
+- **Plugin System**: discovery, loading, and lifecycle.
+- **Quality & Governance**: the runtime tradeoffs and control boundaries that shape the system.
 
-### 3) Quality and Governance
-
-- [Performance Benchmarks](./quality-governance/benchmarks): Why the client is implemented in Go.
-- [Permission Model (Planned)](./quality-governance/permissions): Planned security model, not implemented yet.
+If you read the pages in that order, the rest of the technical section stays in the same flow as the actual system.
 
 
 ## Fast Sanity Commands
@@ -64,5 +58,5 @@ myctl logs
 ```
 
 - `status`: confirms daemon state
-- `schema`: shows registered command tree
-- `logs`: helps diagnose plugin load/dispatch issues
+- `schema`: shows the registered command tree
+- `logs`: helps diagnose plugin load and dispatch issues

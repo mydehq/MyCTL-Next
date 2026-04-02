@@ -1,32 +1,37 @@
 # API Reference
 
-The `myctl.api` package currently exposes three primary SDK objects:
+The `myctl.api` package provides a fully-typed plugin SDK. All public symbols have explicit type hints for seamless IDE autocomplete and type checking.
 
-- `Plugin`: Declarative command/hook registration.
+Primary SDK objects:
+
+- `Plugin`: Declarative command/flag registration.
 - `Context`: Per-invocation execution context passed to handlers.
 - `log`: Context-aware logger proxy for plugin-scoped logging.
 
 ## Import Pattern
 
 ```python
-from myctl.api import Plugin, Context, log
+from myctl.api import Plugin, Context, log, FlagSpec
 ```
 
+All decorators (`@plugin.command`, `@plugin.flag`, `@plugin.flags`) have clear signatures and docstrings showing handler patterns.
+
 > [!IMPORTANT]
-> Plugins must import only from `myctl.api`. Importing internal modules under `myctl.core` is blocked at runtime.
+> Plugins must import only from `myctl.api`. Importing internal modules under `myctld` is blocked at runtime.
 
 ## `Plugin`
 
-Create one plugin instance in `main.py` using the folder/plugin ID:
+Create one plugin instance in `main.py`.
 
 ```python
-plugin = Plugin("weather")
+plugin = Plugin()
 ```
 
 Registration decorators:
 
 - `@plugin.command(path, help="...")`
 - `@plugin.flag(name, short, default, help, ...)`
+- `@plugin.flags([...])`
 - `@plugin.on_load`
 - `@plugin.periodic(seconds=...)`
 
@@ -42,14 +47,16 @@ async def boot(ctx: Context):
 
 Every command handler receives a `Context` object.
 
-| Attribute   | Type             | Description                                      |
-| :---------- | :--------------- | :----------------------------------------------- |
-| `path`      | `list[str]`      | Full command path matched by the router.         |
-| `args`      | `list[str]`      | Remaining positional args after route parsing.   |
-| `flags`     | `dict[str, Any]` | Parsed declarative flag values.                  |
-| `cwd`       | `str`            | Client working directory.                        |
-| `env`       | `dict[str, str]` | Client environment variables.                    |
-| `plugin_id` | `str`            | Plugin namespace currently handling the request. |
+| Attribute      | Type             | Description                                      |
+| :------------- | :--------------- | :----------------------------------------------- |
+| `path`         | `list[str]`      | Full command path matched by the router.         |
+| `args`         | `list[str]`      | Remaining positional args after route parsing.   |
+| `flags`        | `dict[str, Any]` | Parsed declarative flag values.                  |
+| `cwd`          | `str`            | Client working directory.                        |
+| `env`          | `dict[str, str]` | Client environment variables.                    |
+| `plugin_id`    | `str`            | Plugin namespace currently handling the request. |
+| `command_name` | `str`            | Resolved command name for the request.           |
+| `request_id`   | `str`            | Unique request identifier.                       |
 
 ## `log`
 
@@ -63,12 +70,15 @@ Use it anywhere in plugin code (handlers, hooks, helper modules) without passing
 
 ```python
 log.info("running task")
+log.info("starting greet", user="soymadip")
 log.error("task failed: %s", reason)
 ```
 
 Behavior:
 
 - During command execution, `on_load`, and `periodic` hooks, `log` is automatically scoped to `myctl.plugin.<plugin_id>`.
+- Structured keyword arguments on the logger call are stored in the JSONL `fields` object.
+- Request metadata such as `request_id`, `plugin_id`, and `command_name` are attached automatically by the daemon.
 - Outside active plugin execution, it falls back to the core logger namespace.
 
 Because of this, `log` is the canonical logging API for plugin code.

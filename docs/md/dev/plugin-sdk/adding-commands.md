@@ -13,12 +13,14 @@ Commands are registered with the `@plugin.command` decorator.
 from myctl.api import Plugin, Context
 from .src.wifi import list_network_names
 
-plugin = Plugin("wifi")
+plugin = Plugin()
 
 @plugin.command("list", help="List available networks")
 async def list_networks(ctx: Context):
     return ctx.ok(list_network_names())
 ```
+
+The plugin directory name becomes the plugin ID, so `Plugin()` is enough.
 
 `@plugin.command(path, help="help text")`
 
@@ -27,7 +29,7 @@ async def list_networks(ctx: Context):
 
 ## Declarative Flags
 
-Flags are registered with the `@plugin.flag` decorator.
+Flags are registered with the `@plugin.flag` decorator, or in batches with `@plugin.flags([...])`.
 
 
 MyCTL pre-parses and validates them before the handler executes. This keeps handler code focused on business logic rather than argument parsing.
@@ -88,15 +90,38 @@ MyCTL pre-parses and validates them before the handler executes. This keeps hand
 
 This is useful when a command supports only a small set of formats or modes & *you want validation to happen before the handler runs*.
 
+### Multiple Flags at Once
+
+```python
+@plugin.flags([
+    {
+        "name": "port",
+        "short": "p",
+        "default": 8080,
+        "help": "Port to bind",
+    },
+    {
+        "name": "force",
+        "short": "f",
+        "default": False,
+        "help": "Force restart",
+    },
+])
+```
+
+Use `@plugin.flags([...])` when you want to keep a command's options grouped in one block instead of stacking multiple `@plugin.flag(...)` decorators.
+
 ## Full Example
 
 ```python
 from myctl.api import Plugin, Context, log
 
-plugin = Plugin("server")
+plugin = Plugin()
 
-@plugin.flag("port", "p", 8080, "Port to bind")
-@plugin.flag("force", "f", False, "Force restart")
+@plugin.flags([
+    {"name": "port", "short": "p", "default": 8080, "help": "Port to bind"},
+    {"name": "force", "short": "f", "default": False, "help": "Force restart"},
+])
 @plugin.command("run", help="Run the server")
 async def run_server(ctx: Context):
     if ctx.flags.get("force"):

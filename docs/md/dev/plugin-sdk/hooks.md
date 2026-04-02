@@ -20,7 +20,7 @@ Useful for tasks like:
 ```python
 from myctl.api import Plugin, Context, log
 
-plugin = Plugin("myplugin")
+plugin = Plugin()
 
 @plugin.on_load
 async def setup(ctx: Context):
@@ -45,7 +45,7 @@ Useful for tasks like:
 ```python
 from myctl.api import Plugin
 
-plugin = Plugin("myplugin")
+plugin = Plugin()
 
 @plugin.periodic(seconds=60)
 async def refresh_cache():

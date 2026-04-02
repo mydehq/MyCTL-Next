@@ -1,6 +1,31 @@
 # Plugin SDK
 
-MyCTL is designed to be extensible through a stable, public SDK surface: `myctl.api`.
+MyCTL exposes one public plugin surface: `myctl.api`.
+
+Use it to build plugins with the declarative API already shown throughout the SDK docs:
+
+- `Plugin()`
+- `@plugin.command(...)`
+- `@plugin.flag(...)`
+- `@plugin.flags([...])`
+- `@plugin.on_load`
+- `@plugin.periodic(...)`
+
+## Current Surface
+
+The plugin SDK currently provides:
+
+- `Plugin` for declarative command/flag registration
+- `Context` for safe per-invocation data
+- `log` for plugin-scoped logging
+
+## Reserved Command IDs
+
+Plugin IDs live in a namespace that must not overlap with daemon built-in command IDs such as `schema`, `status`, or `plugin`.
+
+- `plugin init` rejects a reserved name immediately.
+- The daemon also validates conflicts at startup, before serving requests.
+- The live built-in command registry is the source of truth, not a separate manual allow/deny list.
 
 ## Plugin Load Flow
 

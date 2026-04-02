@@ -1,15 +1,42 @@
-# Performance Benchmarks: Client Implementation Comparison
+# Client Performance Benchmarks
 
-To ensure MyCTL meets its "Lean Client" design goal, we conducted extensive performance benchmarking across different client implementations. This document captures the results of these tests and justifies the selection of Go (Cobra) as the primary production client.
+This page explains why the MyCTL client is written in Go and what the measured startup costs look like.
 
-## Methodology
+The client is intentionally thin. Its job is to:
 
-The benchmarks measure two critical performance metrics across three client implementations:
+- start fast
+- fetch schema from the daemon
+- forward commands over IPC
+- render the response
 
-1.  **Cold Boot**: The time taken to launch the Python daemon, synchronize the environment via `uv`, fetch the command schema, and execute a simple command (`version`).
-2.  **Warm Run**: The time taken to execute a command when the Python daemon is already active in the background. This measures the pure overhead of the client's startup and IPC layer.
+That means the client’s runtime cost has to stay close to the cost of the IPC round trip itself.
 
-### Implementations Tested
+---
+
+## 1. What Was Measured
+
+The benchmark compares cold and warm command execution across different client implementations.
+
+### Cold Boot
+
+Cold boot measures the full startup path:
+
+- launch the daemon if needed
+- sync the environment
+- fetch the schema
+- execute a simple command
+
+### Warm Run
+
+Warm run measures the client overhead when the daemon is already running.
+
+That is the number that matters most for the day-to-day user experience, because it isolates client startup and IPC cost.
+
+---
+
+## 2. Implementations Compared
+
+The benchmark compared three client shapes:
 
 | Implementation         | Tooling                 | CLI Engine             |
 | :--------------------- | :---------------------- | :--------------------- |
@@ -17,31 +44,61 @@ The benchmarks measure two critical performance metrics across three client impl
 | **Python (Optimized)** | Python 3.14 / `.venv`   | `argparse` (Fast-Path) |
 | **Python (Compiled)**  | Nuitka 4.0 (Standalone) | `argparse` (Fast-Path) |
 
-## Results Summary
+The comparison is not about language preference. It is about the cost of startup and the cost of being the persistent command proxy.
 
-The following results were averaged over 5 iterations on a standard Linux environment.
+---
 
-| Client Implementation | Cold Boot (Avg) | Warm Run (Avg) | Performance Gap (Warm) |
-| :-------------------- | :-------------- | :------------- | :--------------------- |
-| **Go (Cobra)**        | 4,677 ms        | **6.12 ms**    | **Baseline**           |
-| **Python (venv)**     | **4,633 ms**    | 38.45 ms       | ~6x Slower             |
-| **Python (uv run)**   | 4,628 ms        | 76.38 ms       | ~12x Slower            |
-| **Python (Nuitka)**   | 4,932 ms        | 208.09 ms      | ~34x Slower            |
+## 3. Results
 
-## Key Findings
+The tests were averaged across 5 iterations on a standard Linux environment.
 
-### 1. The 6ms Benchmark
+| Client Implementation | Cold Boot (Avg) | Warm Run (Avg) | Warm Gap    |
+| :-------------------- | :-------------- | :------------- | :---------- |
+| **Go (Cobra)**        | 4,677 ms        | **6.12 ms**    | baseline    |
+| **Python (venv)**     | **4,633 ms**    | 38.45 ms       | ~6x slower  |
+| **Python (uv run)**   | 4,628 ms        | 76.38 ms       | ~12x slower |
+| **Python (Nuitka)**   | 4,932 ms        | 208.09 ms      | ~34x slower |
 
-The Go implementation achieves near-native performance for warm runs. The 6ms latency includes dialing the Unix socket, fetching a 3KB JSON schema, inflating the CLI tree, and receiving the response. This is essentially unnoticeable to the user, fulfilling the "Logic-Less Client" promise.
+The important row is the warm run. That is the steady-state client experience.
 
-### 2. Python Startup Overhead
+---
 
-Despite aggressive optimization (Lazy Imports and Fast-Path proxying), the Python interpreter introduces a minimum overhead of ~30-40ms. While small, this is a 6x increase over Go. When wrapped in `uv run`, the overhead jumps to ~75ms due to environment resolution logic.
+## 4. What The Numbers Mean
 
-### 3. Nuitka "Onefile" Latency
+### Go Warm Runs Are Effectively Instant
 
-The Nuitka-compiled standalone binary proved to be the slowest in warm runs (~200ms). This is due to the inherent overhead of the "onefile" self-extractor and the initialization of the embedded Python runtime for every execution. For a "Lean Client" that performs frequent, short-lived tasks, this initialization cost is prohibitive.
+The Go client stays near the IPC cost. It dials the socket, fetches schema, inflates the CLI, and prints the result with very little overhead.
 
-## ⚖️ Final Architecture Decision
+That is the main reason it is the production client.
 
-Based on these results, **Go remains the primary language for the MyCTL Client**. It provides the $O(1)$ proxy performance required for a high-performance system controller. The Python implementation remains a valuable reference for experimental workflows but is not suitable for the performance-critical path.
+### Python Adds Startup Overhead
+
+Even with optimization, Python startup and environment resolution add noticeable delay. That extra time is small in absolute terms but large compared to the Go path.
+
+### Compiled Python Still Pays Runtime Costs
+
+Even when compiled, the Python client still pays for embedded runtime initialization and packaging overhead.
+
+That makes it a poor fit for a client that is expected to start constantly and finish quickly.
+
+---
+
+## 5. Why This Matters Architecturally
+
+The daemon does the work. The client should only proxy it.
+
+If the client starts too slowly, the whole system feels heavier than it needs to be, even when the daemon is efficient.
+
+That is why the client is a lean Go binary and the daemon remains the execution engine.
+
+---
+
+## 6. Operational Conclusion
+
+The benchmark results support one architecture:
+
+- Go for the production client
+- Python for the daemon and plugin runtime
+- schema-driven CLI inflation over IPC
+
+That keeps the client small and predictable while leaving real work in the daemon.

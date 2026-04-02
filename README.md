@@ -56,8 +56,10 @@ Plugins are self-contained Python packages. Drop a folder into `~/.local/share/m
 ```
 myplugin/
 ├── pyproject.toml   # manifest ([project] + [tool.myctl])
-└── main.py          # commands via @registry.add_cmd
+└── main.py          # registration via Plugin() + decorators
 ```
+
+Plugin IDs come from the folder name, and `main.py` stays registration-only.
 
 See the [Plugin SDK Guide](docs/md/dev/plugin-sdk.md) for the full reference.
 

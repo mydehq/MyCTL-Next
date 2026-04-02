@@ -24,6 +24,7 @@ This document tracks implementation status against the current MyCTL architectur
 2. Add command-level regression tests for boot, stop/restart, and schema hydration.
 3. Harden plugin loader error reporting and load-time diagnostics.
 4. Document stable SDK surface guarantees for plugin authors.
+5. Finalize the decorator-driven syscommands refactor plan and migration path.
 
 ## ✅ Verification Checklist
 

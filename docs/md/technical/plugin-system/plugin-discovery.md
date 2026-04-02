@@ -1,97 +1,138 @@
 # Plugin Discovery
 
+This page explains how MyCTL finds plugins on disk and decides which ones are eligible to load.
 
-## Discovery Paths and Priority
+Discovery is a file-system and metadata problem. The daemon scans configured locations, validates each candidate, and hands only the valid ones to the loader.
 
-MyCTL scans plugins in priority order:
+---
 
-1. Development path: project `plugins/`
-2. User path: `$XDG_DATA_HOME/myctl/plugins`
-3. System path: `/usr/share/myctl/plugins`
+## 1. Discovery Order
 
-Earlier paths have higher priority.
+MyCTL scans plugin directories in priority order:
 
-```mermaid
-flowchart TD
-    A[Scan Dev plugins] --> B[Scan User plugins]
-    B --> C[Scan System plugins]
-    C --> D[Build final plugin set]
-```
+1. development path: project `plugins/`
+2. user path: `$XDG_DATA_HOME/myctl/plugins`
+3. system path: `/usr/share/myctl/plugins`
 
+Earlier paths win.
 
-## Shadowing Rule (Name Collision)
+That means a local development plugin can shadow an installed system plugin with the same ID.
 
-Plugin ID is the directory name.
+---
 
-If two plugins share the same ID, the higher-priority one wins and lower-priority ones are ignored.
+## 2. Plugin ID Rules
+
+The plugin ID is the directory name.
+
+If two plugins share the same ID, the higher-priority one wins and the lower-priority one is ignored.
 
 Example:
 
-- `plugins/audio/` (dev)
-- `/usr/share/myctl/plugins/audio/` (system)
+- `plugins/audio/` wins over `/usr/share/myctl/plugins/audio/`
+- the daemon keeps the first valid match in priority order
+- later duplicates are skipped intentionally
 
-Result: dev `audio` is loaded, system `audio` is skipped.
+This is how MyCTL keeps development overrides predictable.
 
-This is intentional so local development overrides shipped defaults safely.
+---
 
+## 3. Validation Before Load
 
-## Validation Before Load
+Before importing a plugin, the daemon checks that the candidate is structurally valid.
 
-Before importing plugin code, MyCTL validates each candidate:
+The checks are straightforward:
 
-1. Directory structure exists
+1. the directory exists
 2. `pyproject.toml` exists
-3. `[project].name` matches folder name exactly
-4. Declared API version is compatible
+3. `[project].name` matches the folder name exactly
+4. declared API compatibility is acceptable
 
-If validation fails, plugin is skipped and error is logged.
+If validation fails, the plugin is skipped and the reason is logged.
 
+This prevents broken metadata from reaching the loader.
 
-## Discovery + Load Pipeline
+---
 
-```mermaid
-flowchart TD
-    A[Found plugin directory] --> B[Read pyproject.toml]
-    B --> C{Valid metadata?}
-    C -- No --> D[Skip + log reason]
-    C -- Yes --> E[Sync dependencies]
-    E --> F[Load plugin in package namespace]
-    F --> G[Register commands]
-```
+## 4. Discovery Pipeline
 
+Discovery is not loading. It only decides which candidates are worth loading.
 
-## Dependency Sync Behavior
+The flow is:
 
-If plugin declares dependencies in `pyproject.toml`, MyCTL syncs them through managed environment tooling before loading.
+1. scan all configured plugin tiers
+2. normalize each candidate directory into metadata
+3. validate the manifest and identity
+4. keep the first valid plugin for each ID
+5. pass the final set to the loader
 
-Important outcomes:
+That separation is important because the loader handles Python import state, while discovery handles filesystem and manifest state.
 
-- Plugin dependencies are available at runtime
-- Dependency failures do not crash the entire daemon
-- Failed plugins are rejected while other plugins continue loading
+---
 
+## 5. Dependency Sync Handoff
 
-## What Discovery Does Not Do
+If a plugin declares dependencies, discovery marks it as loadable but does not install anything itself.
 
-Discovery is responsible for finding and validating plugin candidates.
+The actual sync step happens immediately before import during loading.
 
-It does not:
+That means discovery only answers:
 
-- Parse IPC payloads
-- Execute command dispatch logic
-- Render CLI output
+- is this plugin candidate structurally valid?
+- should this candidate win for its ID?
+- should this candidate move forward to loading?
 
-Those responsibilities belong to registry, IPC, and client layers.
+---
 
+## 6. What Discovery Does Not Do
 
-## Quick Debug Checklist
+Discovery does not:
 
-If a plugin command is missing:
+- import `main.py`
+- dispatch commands
+- run lifecycle hooks
+- render CLI output
+- manage IPC requests
 
-1. Confirm plugin folder is in one of discovery paths.
-2. Confirm folder name matches `[project].name`.
-3. Check daemon logs for validation or dependency errors.
-4. Run `myctl schema` and verify plugin subtree exists.
+Those responsibilities belong to the loader, registry, and client layers.
+
+---
+
+## 7. Why The Priority Model Exists
+
+Priority ordering makes local development practical.
+
+You can keep a working copy of a plugin in the project tree and shadow the installed version without changing any daemon configuration.
+
+That is better than requiring explicit override flags for every local test run.
+
+---
+
+## 8. Debugging Discovery
+
+If a plugin does not show up, check:
+
+- the folder is in one of the configured discovery tiers
+- the folder name matches `[project].name`
+- the directory contains a manifest
+- the manifest parses successfully
+- the plugin is not shadowed by a higher-priority sibling
+
+If a plugin is discovered but not loaded, the problem is usually in validation or dependency sync, not discovery itself.
+
+---
+
+## 9. Summary
+
+Plugin discovery decides which plugin directories should move forward into loading.
+
+It handles:
+
+- search paths
+- priority order
+- shadowing
+- validation
+
+It does not handle import, dispatch, or runtime execution.
 
 
 

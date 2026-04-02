@@ -26,3 +26,8 @@ description = "Start the development daemon"
 run = "uv run myctld"
 dir = "daemon"
 env = { PYTHONPATH = "." }
+
+[tasks.test]
+description = "Run daemon architecture tests"
+run = "uv run pytest tests/ -v"
+dir = "daemon"
