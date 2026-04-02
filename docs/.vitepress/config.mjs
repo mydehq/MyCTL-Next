@@ -65,7 +65,10 @@ export default withMermaid({
               { text: "Introduction", link: "/dev/plugin-sdk/" },
               { text: "Quick Start", link: "/dev/plugin-sdk/quick-start" },
               { text: "Manifest Reference", link: "/dev/plugin-sdk/manifest" },
-              { text: "Adding Commands & Flags", link: "/dev/plugin-sdk/adding-commands" },
+              {
+                text: "Adding Commands & Flags",
+                link: "/dev/plugin-sdk/adding-handlers",
+              },
               { text: "Hooks & Tasks", link: "/dev/plugin-sdk/hooks" },
               { text: "API Reference", link: "/dev/plugin-sdk/api" },
             ],
@@ -83,28 +86,58 @@ export default withMermaid({
             text: "Core Runtime",
             collapsed: true,
             items: [
-              { text: "System Architecture", link: "/technical/core-runtime/architecture" },
-              { text: "Bootstrapping", link: "/technical/core-runtime/bootstrapping" },
-              { text: "IPC Protocol", link: "/technical/core-runtime/ipc-protocol" },
-              { text: "Request Context & Logging", link: "/technical/core-runtime/request-context" },
-              { text: "Core Engine & Registry", link: "/technical/core-runtime/registry" },
+              {
+                text: "System Architecture",
+                link: "/technical/core-runtime/architecture",
+              },
+              {
+                text: "Bootstrapping",
+                link: "/technical/core-runtime/bootstrapping",
+              },
+              {
+                text: "IPC Protocol",
+                link: "/technical/core-runtime/ipc-protocol",
+              },
+              {
+                text: "Request Context & Logging",
+                link: "/technical/core-runtime/request-context",
+              },
+              {
+                text: "Core Engine & Registry",
+                link: "/technical/core-runtime/registry",
+              },
             ],
           },
           {
             text: "Plugin System",
             collapsed: true,
             items: [
-              { text: "Plugin Loading", link: "/technical/plugin-system/plugin-loading" },
-              { text: "Plugin Discovery", link: "/technical/plugin-system/plugin-discovery" },
-              { text: "Plugin Lifecycle", link: "/technical/plugin-system/lifecycle" },
+              {
+                text: "Plugin Loading",
+                link: "/technical/plugin-system/plugin-loading",
+              },
+              {
+                text: "Plugin Discovery",
+                link: "/technical/plugin-system/plugin-discovery",
+              },
+              {
+                text: "Plugin Lifecycle",
+                link: "/technical/plugin-system/lifecycle",
+              },
             ],
           },
           {
             text: "Quality & Governance",
             collapsed: true,
             items: [
-              { text: "Performance Benchmarks", link: "/technical/quality-governance/benchmarks" },
-              { text: "Permission Model (Planned)", link: "/technical/quality-governance/permissions" },
+              {
+                text: "Performance Benchmarks",
+                link: "/technical/quality-governance/benchmarks",
+              },
+              {
+                text: "Permission Model (Planned)",
+                link: "/technical/quality-governance/permissions",
+              },
             ],
           },
         ],

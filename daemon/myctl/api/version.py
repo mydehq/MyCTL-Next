@@ -1,3 +1,3 @@
-VERSION = "2.0.0-PRO-ALPHA"
-def get_version():
-    return f"MyCTL SDK v{VERSION}"
+__all__ = ["__version__"]
+
+__version__ = "0.2.0"

@@ -9,7 +9,7 @@ export const metadata = {
   // 📦 Versions & Requirements
   versions: {
     python_min: "3.14+",
-    api_ver: "2.5.0",
+    api: "2.5.0",
   },
 
   // 🏗 Infrastructure Paths

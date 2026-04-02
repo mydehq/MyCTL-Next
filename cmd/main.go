@@ -27,10 +27,17 @@ import (
 // ── Types ───────────────────────────────────────────────────────────────────
 
 type Request struct {
-	Path []string          `json:"path"`
-	Args []string          `json:"args"`
-	Cwd  string            `json:"cwd"`
-	Env  map[string]string `json:"env"`
+	Path     []string          `json:"path"`
+	Args     []string          `json:"args"`
+	Cwd      string            `json:"cwd"`
+	Env      map[string]string `json:"env"`
+	Terminal TerminalRequest    `json:"terminal"`
+}
+
+type TerminalRequest struct {
+	IsTTY      bool   `json:"is_tty"`
+	ColorDepth  string `json:"color_depth"`
+	NoColor     bool   `json:"no_color"`
 }
 
 type Response struct {
@@ -103,12 +110,34 @@ func getLogPath() string {
 	return filepath.Join(xdg.StateHome, "myctl", "daemon.log")
 }
 
+func isDaemonRunning() bool {
+	conn, err := net.Dial("unix", getSocketPath())
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
 func sendIPCRequest(req Request, allowBootstrap bool) (*Response, error) {
 	if req.Args == nil {
 		req.Args = []string{}
 	}
 	if req.Env == nil {
 		req.Env = make(map[string]string)
+	}
+	if req.Terminal == (TerminalRequest{}) {
+		isTTY := term.IsTerminal(int(syscall.Stdout)) || term.IsTerminal(int(syscall.Stderr))
+		req.Terminal = TerminalRequest{
+			IsTTY:     isTTY,
+			ColorDepth: func() string {
+				if isTTY {
+					return "16"
+				}
+				return "none"
+			}(),
+			NoColor: !isTTY || os.Getenv("NO_COLOR") != "",
+		}
 	}
 
 	reqBytes, _ := json.Marshal(req)
@@ -206,7 +235,7 @@ func sendIPCRequest(req Request, allowBootstrap bool) (*Response, error) {
 // ── Schema Layer ─────────────────────────────────────────────────────────────
 
 func fetchSchema(allowBootstrap bool) (map[string]CommandNode, error) {
-	req := Request{Path: []string{"__sys_schema"}}
+	req := Request{Path: []string{"schema"}}
 	resp, err := sendIPCRequest(req, allowBootstrap)
 	if err != nil {
 		return nil, err
@@ -236,11 +265,22 @@ func tailLogs() {
 	_ = cmd.Run()
 }
 
-func executeDaemonCommand(path []string, _ []string) {
+func executeDaemonCommand(path []string, args []string) {
+	if len(path) > 0 && path[len(path)-1] == "start" && !background {
+		if isDaemonRunning() {
+			fmt.Fprintln(os.Stdout, "Daemon is already running.")
+			os.Exit(0)
+		}
+		if err := RunDaemonForeground(); err != nil {
+			log.Fatal().Err(err).Msg("Failed to run daemon in foreground")
+		}
+		os.Exit(0)
+	}
+
 	cwd, _ := os.Getwd()
 	req := Request{
 		Path: path,
-		Args: os.Args[1:], // Pass all raw args to Python
+		Args: args,
 		Cwd:  cwd,
 		Env:  make(map[string]string),
 	}
@@ -275,7 +315,7 @@ func executeDaemonCommand(path []string, _ []string) {
 			}
 		}
 
-		if (name == "start" || name == "logs") && !background {
+		if name == "logs" && !background {
 			log.Info().Msg("Following logs (CTRL-C to detach)...")
 			tailLogs()
 		}
@@ -347,11 +387,25 @@ func buildCobraCommand(name string, node CommandNode, parentPath []string) *cobr
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
+	hasBackgroundFlag := false
+	for _, arg := range os.Args[1:] {
+		if arg == "-b" || arg == "--background" {
+			hasBackgroundFlag = true
+			break
+		}
+	}
+
 	// 1. Intercept 'stop' and 'status' (avoid cold-boot if dead)
 	if len(os.Args) > 1 {
 		arg := os.Args[1]
 		isStop := arg == "stop" || (arg == "daemon" && len(os.Args) > 2 && os.Args[2] == "stop")
 		isStatus := arg == "status" || (arg == "daemon" && len(os.Args) > 2 && os.Args[2] == "status")
+		isStart := arg == "start" || (arg == "daemon" && len(os.Args) > 2 && os.Args[2] == "start")
+
+		if isStart && !hasBackgroundFlag {
+			executeDaemonCommand(os.Args[1:], os.Args[2:])
+			return
+		}
 
 		if isStop || isStatus {
 			_, err := fetchSchema(false)
@@ -370,7 +424,7 @@ func main() {
 	schema, err := fetchSchema(true)
 	if err != nil {
 		log.Warn().Err(err).Msg("Schema fetch failed. Proxying directly.")
-		executeDaemonCommand(os.Args[1:], os.Args[1:])
+		executeDaemonCommand(os.Args[1:], nil)
 		return
 	}
 

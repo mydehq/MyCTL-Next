@@ -1,0 +1,29 @@
+{
+    "schema_request": {
+        "path": [
+            "schema"
+        ],
+        "args": [],
+        "cwd": "",
+        "env": {},
+        "terminal": {
+            "is_tty": false,
+            "color_depth": "none",
+            "no_color": true
+        }
+    },
+    "command_request": {
+        "path": [
+            "flagprobe",
+            "flags"
+        ],
+        "args": [],
+        "cwd": "/home/soymadip/Projects/MyCTL-Next",
+        "env": {},
+        "terminal": {
+            "is_tty": false,
+            "color_depth": "none",
+            "no_color": true
+        }
+    }
+}

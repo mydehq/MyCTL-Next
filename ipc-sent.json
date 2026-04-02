@@ -1,0 +1,41 @@
+{
+    "source": "strace write/sendto capture",
+    "command": "./bin/myctl flagprobe flags --goog -m dev -H 10.11 -s",
+    "frames": [
+        {
+            "order": 1,
+            "raw": "{\"path\":[\"schema\"],\"args\":[],\"cwd\":\"\",\"env\":{},\"terminal\":{\"is_tty\":false,\"color_depth\":\"none\",\"no_color\":true}}",
+            "parsed": {
+                "path": [
+                    "schema"
+                ],
+                "args": [],
+                "cwd": "",
+                "env": {},
+                "terminal": {
+                    "is_tty": false,
+                    "color_depth": "none",
+                    "no_color": true
+                }
+            }
+        },
+        {
+            "order": 2,
+            "raw": "{\"path\":[\"flagprobe\",\"flags\"],\"args\":[],\"cwd\":\"/home/soymadip/Projects/MyCTL-Next\",\"env\":{},\"terminal\":{\"is_tty\":false,\"color_depth\":\"none\",\"no_color\":true}}",
+            "parsed": {
+                "path": [
+                    "flagprobe",
+                    "flags"
+                ],
+                "args": [],
+                "cwd": "/home/soymadip/Projects/MyCTL-Next",
+                "env": {},
+                "terminal": {
+                    "is_tty": false,
+                    "color_depth": "none",
+                    "no_color": true
+                }
+            }
+        }
+    ]
+}

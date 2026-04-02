@@ -2,12 +2,13 @@
 name = "myctld"
 version = "0.2.0"
 description = "MyCTL Daemon"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "dbus-fast>=4.0.0",
     "hyprpy>=0.2.1",
     "platformdirs>=4.9.4",
     "pulsectl-asyncio>=0.8.0",
     "pydantic>=2.0.0",
+    "pytest>=9.0.2",
     "setproctitle>=1.3.7",
 ]

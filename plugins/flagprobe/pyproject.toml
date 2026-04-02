@@ -1,0 +1,11 @@
+[project]
+name = "flagprobe"
+version = "1.0.0"
+description = "Diagnostic plugin to inspect flag values"
+
+[tool.myctl]
+api_version = "0.2.0"
+entry = "main.py"
+
+[tool.myctl.groups]
+"debug" = "Inspect command flags and defaults"

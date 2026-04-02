@@ -8,7 +8,7 @@ Before starting plugin development, ensure:
 
 - MyCTL is installed and working: [Installation Guide](../../guide/install)
 - `uv` is available in your shell: [uv docs]({{metadata.tools.uv}})
-- You are comfortable with basic Python imports and async functions
+- You are **comfortable with basic Python imports and async functions**
 
 ## Plugin Structure
 
@@ -18,7 +18,7 @@ plugins/myplugin/
 ├── main.py
 └── src/
     ├── __init__.py
-    └── commands.py
+    └── cmds.py
 ```
 
 | Element              | Purpose                                   |
@@ -29,25 +29,20 @@ plugins/myplugin/
 | **`src/`**           | Implementation modules and business logic |
 
 > [!IMPORTANT]
-> Keep `main.py` registration-only. Place implementation in `src/` and import via relative imports (for example, `from .src.commands import ...`).
+> It's encouraged to keep `main.py` registration-only.  
+> Place implementation in `src/` & import via relative imports (e.g. `from .src.cmds import ...`).
 
-## 1. Create the Plugin Directory
+## 1. Create Your Plugin Directory
 
-Create your plugin dir under the configured plugin path:
+Initialize your new plugin Dir with boilerplate files
+The generator prompts for:
 
-```bash
-mkdir -p {{metadata.paths.plugins}}/myplugin
-cd {{metadata.paths.plugins}}/myplugin
-```
-
-The directory name (`myplugin`) becomes your **plugin ID**.
-
-## 2. Initialize Boilerplate
-
-Run the generator inside the plugin directory:
+- description
+- author(s)
 
 ```bash
-myctl plugin init
+myctl plugin init myplugin
+cd myplugin
 ```
 
 Or initialize directly to a target path with non-interactive defaults:
@@ -56,10 +51,7 @@ Or initialize directly to a target path with non-interactive defaults:
 myctl plugin init ./myplugin --author "Your Name" --desc "My plugin"
 ```
 
-The generator prompts for:
-
-- description
-- author(s)
+The directory name (`myplugin`) becomes your **plugin ID**. It will bind to CLI like `myctl myplugin hello`
 
 Then it creates the initial files:
 
@@ -67,9 +59,6 @@ Then it creates the initial files:
 - `main.py` (registration-only)
 - `src/__init__.py`
 - `src/commands.py`
-
-> [!TIP]
-> For multiple authors, provide a comma-separated list.
 
 ## 3. Add Dependencies (Optional)
 
@@ -79,7 +68,7 @@ From inside your plugin directory:
 uv add requests # or any other package needed
 ```
 
-Git dependencies are supported:
+Git dependencies are also supported:
 
 ```bash
 uv add "my-lib @ git+https://github.com/org/my-lib"
@@ -87,39 +76,41 @@ uv add "my-lib @ git+https://github.com/org/my-lib"
 
 ## 4. Register a First Command
 
-If you used `myctl plugin init`, this skeleton is already generated. You can now edit it.
+The skeleton is already generated. You can now edit it.
 
-### `main.py` (registration)
+### `main.py` (Registration)
 
 ```python
-from myctl.api import Plugin, Context
-from .src.commands import hello_message
+from myctl.api import Plugin, Context, log  # import sdk
+from .src.commands import hello_msg         # import implementations
 
-plugin = Plugin()
+plugin = Plugin()  # Create instance of Plugin class
 
-@plugin.command("hello", help="Confirm myplugin is working")
-async def hello(ctx: Context):
+@plugin.command("hello", help="Confirm myplugin is working")  # register command "hello"
+async def hello_msg(ctx: Context):
     return ctx.ok(hello_message())
 ```
 
-### `src/commands.py` (implementation)
+### `src/commands.py` (Implementation)
 
 ```python
-def hello_message() -> str:
+def hello_msg() -> str:
     return "Hello from myplugin"
 ```
 
 ## 5. Configure IDE SDK Support
 
+To get
+
 ```bash
-myctl sdk
+myctl sdk set <vscode|zed|pycharm>
 ```
 
-This configures IDE import resolution for `myctl.api` autocompletion and type hints.
+This configures IDE import resolution for `myctl.api` autocompletion & type hints.
 
 ## 6. Reload and Validate
 
-After editing plugin code, reload daemon state:
+After editing plugin code, reload daemon:
 
 ```bash
 myctl restart
@@ -139,19 +130,19 @@ Hello from myplugin
 
 ## Troubleshooting
 
-### Command not visible
+### Command Not Visible
 
 - Verify plugin folder name matches `[project].name`
-- Run `myctl schema` and confirm your plugin tree exists
+- Run `myctl schema` and confirm your plugin in command tree exists
 - Check `myctl logs` for discovery/load errors
 - Restart daemon after file changes
 
-### Import errors
+### Import Errors
 
 - Confirm `src/__init__.py` exists
 - Use package-relative imports from `main.py` (`from .src...`)
 
-### Dependency import failures
+### Dependency Import Failures
 
 - Confirm dependency exists in `[project].dependencies`
 - Run `uv add <package>` in plugin directory
