@@ -2,7 +2,7 @@
 
 This page is for **client implementers** building custom frontends, wrappers, TUI clients, or automation tooling that talks directly to the MyCTL daemon.
 
-For full wire details, see [IPC Protocol](../technical/core-runtime/ipc-protocol.md).
+For full wire details, see [IPC Protocol](../technical/core/ipc-protocol.md).
 
 ## Endpoint & Transport
 
