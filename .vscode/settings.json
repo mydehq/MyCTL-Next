@@ -3,7 +3,9 @@
   "editor.formatOnSave": true,
   "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font Mono",
   "python.defaultInterpreterPath": "./daemon/.venv/bin/python",
-  "python.analysis.extraPaths": ["./daemon"],
+  "python.analysis.extraPaths": [
+    "./daemon"
+  ],
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnPaste": true,
   "[python]": {
@@ -13,6 +15,9 @@
     "editor.defaultFormatter": "tamasfe.even-better-toml"
   },
   "[go.mod]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "[go]": {
     "editor.defaultFormatter": "golang.go"
   }
 }

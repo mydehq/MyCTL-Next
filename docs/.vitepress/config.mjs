@@ -16,15 +16,15 @@ export default withMermaid({
 
   head: [["link", { rel: "icon", type: "image/svg+xml", href: "/icon.svg" }]],
 
-  title: metadata.title,
-  description: metadata.description,
+  title: metadata.project.title,
+  description: metadata.project.desc,
 
   transformPageData(pageData) {
     pageData.frontmatter.metadata = metadata;
     if (pageData.relativePath === "index.md") {
-      pageData.frontmatter.hero.name = metadata.title;
-      pageData.frontmatter.hero.text = metadata.description;
-      pageData.frontmatter.hero.tagline = metadata.tagline;
+      pageData.frontmatter.hero.name = metadata.project.title;
+      pageData.frontmatter.hero.text = metadata.project.desc;
+      // Intentionally not overwriting tagline so the one in index.md shines through
     }
   },
 
@@ -42,7 +42,7 @@ export default withMermaid({
     nav: [
       { text: "Getting Started", link: "/guide/getting-started" },
       { text: "Plugin SDK", link: "/dev/plugin-sdk" },
-      { text: "Technical", link: "/technical/overview" },
+      { text: "Technical", link: "/technical/" },
     ],
 
     sidebar: [
@@ -73,7 +73,7 @@ export default withMermaid({
               { text: "API Reference", link: "/dev/plugin-sdk/api" },
             ],
           },
-          { text: "Daemon Commands", link: "/dev/daemon-commands" },
+          { text: "System Commands", link: "/dev/system-commands" },
           { text: "Client API (IPC)", link: "/dev/client-api" },
         ],
       },
@@ -81,30 +81,44 @@ export default withMermaid({
         text: "Technical Reference",
         collapsed: false,
         items: [
-          { text: "Overview", link: "/technical/overview" },
+          { text: "Overview", link: "/technical/" },
           {
-            text: "Core Runtime",
+            text: "Core Architecture",
             collapsed: true,
             items: [
               {
-                text: "System Architecture",
-                link: "/technical/core-runtime/architecture",
+                text: "System Blueprint",
+                link: "/technical/core/architecture",
               },
               {
-                text: "Bootstrapping",
-                link: "/technical/core-runtime/bootstrapping",
+                text: "Engine Runtime",
+                link: "/technical/core/runtime",
+              },
+              {
+                text: "Engine Bootstrapping",
+                link: "/technical/core/bootstrapping",
+              },
+              {
+                text: "Engine Services",
+                link: "/technical/core/services",
               },
               {
                 text: "IPC Protocol",
-                link: "/technical/core-runtime/ipc-protocol",
+                link: "/technical/core/ipc-protocol",
+              },
+            ],
+          },
+          {
+            text: "Command Registry",
+            collapsed: true,
+            items: [
+              {
+                text: "Routing & Dispatch",
+                link: "/technical/registry/dispatch",
               },
               {
-                text: "Request Context & Logging",
-                link: "/technical/core-runtime/request-context",
-              },
-              {
-                text: "Core Engine & Registry",
-                link: "/technical/core-runtime/registry",
+                text: "Schema Inflation",
+                link: "/technical/registry/schemas",
               },
             ],
           },
@@ -113,30 +127,22 @@ export default withMermaid({
             collapsed: true,
             items: [
               {
-                text: "Plugin Loading",
-                link: "/technical/plugin-system/plugin-loading",
+                text: "Discovery & Tiers",
+                link: "/technical/plugins/discovery",
               },
               {
-                text: "Plugin Discovery",
-                link: "/technical/plugin-system/plugin-discovery",
-              },
-              {
-                text: "Plugin Lifecycle",
-                link: "/technical/plugin-system/lifecycle",
+                text: "Security & Guard",
+                link: "/technical/plugins/security",
               },
             ],
           },
           {
-            text: "Quality & Governance",
+            text: "SDK Specification",
             collapsed: true,
             items: [
               {
-                text: "Performance Benchmarks",
-                link: "/technical/quality-governance/benchmarks",
-              },
-              {
-                text: "Permission Model (Planned)",
-                link: "/technical/quality-governance/permissions",
+                text: "Protocols (Interfaces)",
+                link: "/technical/sdk/protocols",
               },
             ],
           },
@@ -144,6 +150,6 @@ export default withMermaid({
       },
     ],
 
-    socialLinks: [{ icon: "github", link: metadata.repo }],
+    socialLinks: [{ icon: "github", link: metadata.project.repo }],
   },
 });

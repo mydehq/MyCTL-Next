@@ -1,33 +1,26 @@
 # Plugins SDK
 
-MyCTL exposes one public plugin surface: `myctl.api`.
+MyCTL exposes a single, easy to use public api: `{{metadata.pkgs.sdk}}`, which can be used to build plugins to extend Command list:
 
-Use it to build plugins with the declarative API shown throughout the SDK docs:
+## Core API Surface
 
-## Current Surface
+The SDK provides a modern, type-safe way to define commands and interact with the system:
 
-The plugin SDK currently provides:
+- `Plugin`: The primary registration helper for commands, flags, and lifecycle hooks.
+- `Context`: Provides per-invocation metadata (args, environment, terminal state).
+- `flag`: Helper used in function signatures to declare CLI parameters.
+- `log`: A plugin-scoped logger that automatically attributes entries to your plugin ID.
+- `style`: Helpers for consistent terminal output (colors, tables, bold text).
 
-- `Plugin` for declarative command/flag registration
-- `Context` for safe per-invocation data
-- `log` for plugin-scoped logging
+### Example: Hello World
 
-## Reserved Command IDs
+```python
+from {{metadata.pkgs.sdk}} import Plugin, Context, flag
 
-Plugin IDs live in a namespace that must not overlap with daemon built-in command IDs such as `schema`, `status`, or `plugin`.
+plugin = Plugin()
 
-- `plugin init` rejects a reserved name immediately at start.
-- The daemon also validates conflicts at startup, before serving requests.
-- The live built-in command registry is the source of truth, not a separate manual allow/deny list.
-
-## Plugin Load Flow
-
-When MyCTL starts, each plugin goes through a strict load sequence:
-
-1. Discover plugin directories from configured tiers.
-2. Validate plugin identity and API compatibility from `pyproject.toml`.
-3. Sync declared dependencies using `uv`.
-4. Import the plugin entry module and register commands/hooks.
-5. Run `on_load`, then start `periodic` tasks.
-
-If any step fails, that plugin is rejected and the daemon keeps running.
+@plugin.command("hello", help="Say hello")
+async def hello(ctx: Context, name: str = flag("n", default="World", help="Who to greet")):
+    # Flags are injected directly as typed arguments!
+    return ctx.ok(f"Hello, {name}!")
+```

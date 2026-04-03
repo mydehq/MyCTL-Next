@@ -10,7 +10,7 @@ Ensure the following tools are available in your system path:
 2. **<a :href="metadata.tools.uv">uv</a>**: Used to manage the Python environment for the daemon.
 
 > [!NOTE]
-> You do not need a globally installed Python 3 runtime. `uv` will download and manage a private Python environment for MyCTL.
+> You do not need a globally installed Python 3 runtime. `uv` will download and manage a private Python environment for the MyCTL Engine.
 
 ---
 

@@ -1,6 +1,6 @@
 # Quick Start
 
-This guide walks through the standard plugin authoring workflow: create, register, reload, and validate.
+This guide walks through the steps to Initialize a plugin.
 
 ## Prerequisites
 
@@ -34,29 +34,32 @@ plugins/myplugin/
 
 ## 1. Create Your Plugin Directory
 
-Initialize your new plugin Dir with boilerplate files
+### TODO: initilize in plugin dir.
+
+Initialize your new plugin Dir with boilerplate files in plugin directory. It checks if the id is available & not in [system commands](/docs/md/dev/system-commands.md).
+
 The generator prompts for:
 
 - description
 - author(s)
 
-```bash
-myctl plugin init myplugin
-cd myplugin
+```bash-vue
+{{metadata.pkgs.sdk}} plugin init myplugin
+cd {{metadata.paths.plugins}}/myplugin
 ```
 
 Or initialize directly to a target path with non-interactive defaults:
 
 ```bash
-myctl plugin init ./myplugin --author "Your Name" --desc "My plugin"
+{{metadata.pkgs.sdk}} plugin init myplugin --author "Your Name" --desc "My plugin"
 ```
 
-The directory name (`myplugin`) becomes your **plugin ID**. It will bind to CLI like `myctl myplugin hello`
+The directory name (`myplugin`) becomes your **plugin ID**. It will bind to CLI (like `{{metadata.pkgs.sdk}} myplugin hello`).
 
 Then it creates the initial files:
 
 - `pyproject.toml`
-- `main.py` (registration-only)
+- `main.py`
 - `src/__init__.py`
 - `src/commands.py`
 
@@ -76,50 +79,53 @@ uv add "my-lib @ git+https://github.com/org/my-lib"
 
 ## 4. Register a First Command
 
-The skeleton is already generated. You can now edit it.
+The skeleton is already generated. You can now edit it using the modern **Typed Signature** API.
 
 ### `main.py` (Registration)
 
 ```python
-from myctl.api import Plugin, Context, log  # import sdk
-from .src.commands import hello_msg         # import implementations
+from {{metadata.pkgs.sdk}} import Plugin, Context, flag, log   # import sdk
+from .src.commands import hello_msg            # import implementations
 
-plugin = Plugin()  # Create instance of Plugin class
+plugin = Plugin()  # Registration-only instance
 
-@plugin.command("hello", help="Confirm myplugin is working")  # register command "hello"
-async def hello_msg(ctx: Context):
-    return ctx.ok(hello_message())
+@plugin.root
+async def main(ctx: Context, name: str = flag("n", default="World", help="Who to greet")):
+    # Flags are injected directly!
+    # Logic is delegated to src/ modules
+    result = hello_msg(name)
+    return ctx.ok(result)
 ```
 
 ### `src/commands.py` (Implementation)
 
 ```python
-def hello_msg() -> str:
-    return "Hello from myplugin"
+def hello_msg(name: str) -> str:
+    return f"Hello, {name} from myplugin"
 ```
 
-## 5. Configure IDE SDK Support
+## 5. Configure IDE Support
 
 To get
 
 ```bash
-myctl sdk set <vscode|zed|pycharm>
+{{metadata.pkgs.sdk}} sdk set <vscode|zed|pycharm>
 ```
 
-This configures IDE import resolution for `myctl.api` autocompletion & type hints.
+This configures IDE import resolution for `{{metadata.pkgs.sdk}}` autocompletion & type hints.
 
 ## 6. Reload and Validate
 
 After editing plugin code, reload daemon:
 
 ```bash
-myctl restart
+{{metadata.pkgs.sdk}} restart
 ```
 
 Now test your command:
 
 ```bash
-myctl myplugin hello
+{{metadata.pkgs.sdk}} myplugin hello
 ```
 
 Expected output:
@@ -128,13 +134,20 @@ Expected output:
 Hello from myplugin
 ```
 
+## Reserved Command IDs
+
+Plugin IDs must not overlap with daemon built-in command IDs.
+
+- If a plugin directory name matches an internal plugin ID (e.g., `status`, `stop`, `plugin`), the plugin will be rejected at load time.
+- The Engine's internal registry is the final source of truth for command availability.
+
 ## Troubleshooting
 
 ### Command Not Visible
 
 - Verify plugin folder name matches `[project].name`
-- Run `myctl schema` and confirm your plugin in command tree exists
-- Check `myctl logs` for discovery/load errors
+- Run `{{metadata.pkgs.sdk}} schema` and confirm your plugin in command tree exists
+- Check `{{metadata.pkgs.sdk}} logs` for discovery/load errors
 - Restart daemon after file changes
 
 ### Import Errors

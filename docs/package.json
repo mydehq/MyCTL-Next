@@ -1,8 +1,8 @@
 {
   "scripts": {
-    "dev": "vitepress dev",
+    "dev": "vitepress dev --host",
     "build": "vitepress build",
-    "preview": "vitepress preview"
+    "preview": "vitepress preview --host"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1"

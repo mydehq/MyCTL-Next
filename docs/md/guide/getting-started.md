@@ -7,10 +7,10 @@ Welcome to **MyCTL**. This guide helps you run your first commands and verify th
 MyCTL uses a lean client and a persistent background service.
 
 - **Client (`myctl`)**: Runs your command and prints the result.
-- **Python service**: Keeps the command environment available between runs.
+- **Engine (`myctld`)**: Background service that manages the plugin lifecycle.
 
 > [!NOTE]
-> The client starts the service automatically when needed. You do not need to start it manually.
+> The client starts the Engine automatically when needed. You do not need to start it manually.
 
 
 ## First Run
@@ -30,18 +30,18 @@ On first run:
 **Output:** `pong`
 
 
-## Explore Built-in Commands
+## Explore Internal Plugins
 
-MyCTL includes built-in commands for common system tasks:
+MyCTL includes several "Internal Plugins" for system management:
 
 ```bash
 # Check daemon status
 myctl status
 
-# Restart daemon runtime
+# Restart the Engine
 myctl restart
 
-# Show current command schema
+# Show the Unified Schema
 myctl schema
 ```
 
@@ -56,4 +56,4 @@ myctl audio status
 
 - **[Command Reference](./command-reference.md)**: Complete command list with examples.
 - **[Plugin SDK](../dev/plugin-sdk/)**: Build plugins with the public SDK.
-- **[Technical](../technical/overview.md)**: Learn how MyCTL works internally.
+- **[Technical](../technical/)**: Learn how the Engine works internally.

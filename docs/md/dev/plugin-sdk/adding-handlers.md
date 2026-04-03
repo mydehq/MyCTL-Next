@@ -1,242 +1,187 @@
-# Command & Flag Registration
+# Adding Commands & Flags
 
-This page documents how to define commands and flags in a plugin.
+This page documents how to register commands and flags in a plugin using the `{{metadata.pkgs.sdk}}` SDK.
 
-**The API is declarative**: you register handlers on a `Plugin` instance, and MyCTL builds the CLI surface from that metadata.
+> [!IMPORTANT] Signature-driven API
+> Define your command inputs as regular function parameters.  
+> The SDK reads the function signature, builds the CLI, and injects parsed, typed values into your handler.
+
+---
+
+## TODO: Add support for [arguments](https://typer.tiangolo.com/tutorial/arguments/optional/#make-an-optional-cli-argument)
+
+## Also Plugin optional/required is not implemented yet.
+
+--
 
 ## Prerequisites
 
-Before registering any handler, we need to import SDK, implementations & make instance of `Plugin` class.
+Before registering any handler, initialize your `Plugin` instance in `main.py`.
 
-```bash
-from myctl.api import Plugin, Context
-from .src.wifi import list_network_names
+```python
+from {{metadata.pkgs.sdk}} import Plugin, Context, flag
 
 plugin = Plugin()
 ```
 
 ## Registering Commands
 
-Commands are registered with the `@plugin.command` decorator.
+### Root Command
 
-`@plugin.command(path, help="help text")`
-
-- **`path`**: Space-separated command path within the plugin hierarchy.
-- **`help`**: Short description displayed in CLI help output.
-
-<big>Example:</big>
-
-Register `myctl myplugin list` command:
+Use the `@plugin.root` decorator to register the **primary entry point for your plugin**.
+<br>
+**There should & must have only one root command per plugin**
 
 ```python
-@plugin.command("list", help="List available networks")
-async def list_networks(ctx: Context):
-    return ctx.ok(list_network_names())  # Return success state with network list
+# Command: `{{metadata.pkgs.sdk}} <plugin>`
+@plugin.root
+async def main(ctx: Context):
+    return ctx.ok("Plugin is active")
 ```
 
-## Register Flags
+### Sub Commands
 
-Flags are extra options you attach to a command: ports, modes, paths, booleans, etc.
+Use the `@plugin.command` decorator to define sub-actions.
 
-You register them with `@plugin.flag(...)`.
-
-`@plugin.flag(name, short, *, default=None, help, flag_type=None, choices=None, required=False)`
-
-### Positional Parameters
-
-| Position |  Parameter  | Type  | Default | Description                                                                                 |
-| :------: | :---------: | :---- | :-----: | :------------------------------------------------------------------------------------------ |
-|    1     | **`name`**  | `str` |    —    | **(required)** <br/> Long flag name (e.g., "port").<br> Prefix `--` is added automatically. |
-|    2     | **`short`** | `str` |    —    | **(required)** <br/> Shorthand alias (e.g., "p"). <br> Prefix `-` is added automatically.   |
-
-### Keyworded Parameters
-
-|    Parameter    | Type               | Default | Description                                                                            |
-| :-------------: | :----------------- | :-----: | :------------------------------------------------------------------------------------- |
-|   **`help`**    | `str`              |    —    | **(required)** <br/> Usage description displayed in CLI help.                          |
-|  **`default`**  | `object`           | `None`  | Default value if flag not provided. <br> If omitted, flag is optional with no default. |
-| **`flag_type`** | `type \| None`     | `None`  | Explicitly specify the flag's type. Auto-detected from default if not provided.        |
-|  **`choices`**  | `Sequence[object]` | `None`  | Restrict flag to a fixed set of allowed values.                                        |
-| **`required`**  | `bool`             | `False` | Whether the flag must be provided by the user.                                         |
-
-Below are the commonest scenarios and how to express them.
+```python
+# Command: `{{metadata.pkgs.sdk}} <plugin> list`
+@plugin.command("list", help="List available resources")
+async def list_resources(ctx: Context):
+    ...
+```
 
 ---
 
-<big><b>Examples:</b></big>
+## Defining Flags
 
-### 1. Optional Flag with a Default
+Flags are defined as **function parameters** using the `flag()` helper as a default value.
 
-Use this when the flag is **nice to have**, but your command still works without it.
+`name: type = flag(short, *, default, help, ...)`
+
+- **`short`**: Short alias (e.g., `"p"` -> `-p`).
+- **`help`**: Usage description shown in CLI help.
+- **`default`**: Default value if the flag is omitted.
+- **`choices`**: Allowed values for the flag.
+- **`flag_type`**: Optional explicit type override (rarely needed).
+
+---
+
+### Examples
+
+#### 1. Optional Flag (with Default value)
+
+**Provide a default** to make the flag optional. The SDK casts the CLI value to the annotated type.
 
 ```python
-@plugin.flag("port", "p", default=8080, help="Port to bind")
 @plugin.command("serve", help="Run HTTP server")
-async def serve(ctx: Context):
-    port = ctx.flags["port"]  # Always present, falls back to 8080
+async def serve(ctx: Context, port: int = flag("p", default=8080, help="Port to bind")):
+    # 'port' is injected as an int
+    log.info(f"Serving on port {port}")
     ...
 ```
 
 **User experience:**
 
-- `myctl myplugin serve` → uses port `8080`
-- `myctl myplugin serve --port 9090` → uses port `9090`
+- `{{metadata.pkgs.sdk}} myplugin serve` → `port = 8080`
+- `{{metadata.pkgs.sdk}} myplugin serve --port 9090` → `port = 9090`
 
-**Key points:**
+#### 2. Required Flag
 
-- If you supply `default=...`, the flag becomes **optional**.
-- The type is inferred from the default (`8080` → `int`).
-
-### 2. Required Flag (User Must Provide It)
-
-Use this when the command **cannot run** without the flag.
+Omit `default` to mark the flag required (recommended):
 
 ```python
-@plugin.flag("output", "o", help="Where to save the report", required=True)
 @plugin.command("report", help="Generate a report")
-async def generate_report(ctx: Context):
-    output_path = ctx.flags["output"]  # Guaranteed to be present
+async def generate_report(ctx: Context, output: str = flag("o", help="Output path")):
+    # Engine validates presence of --output before calling your handler
     ...
 ```
 
-**User experience:**
+If the client does not pass `--output` the Engine will respond with a helpful error like:
 
-- `myctl myplugin report` → validation error: `--output` is required
-- `myctl myplugin report --output /tmp/report.json` → runs normally
+```
+missing required flag: --output
+```
 
-**Key points:**
+#### 3. Boolean Toggle (Switch)
 
-- `required=True` marks the flag as mandatory.
-- You typically **don't** provide a default when `required=True`; the value comes from the user.
-
----
-
-### 3. Boolean Toggle (On/Off Switch)
-
-Use this for simple switches like `--force`, `--verbose`, or `--dry-run`.
+Define a boolean default to create a toggle flag.
 
 ```python
-@plugin.flag("force", "f", default=False, help="Force execution")
 @plugin.command("cleanup", help="Clean temporary files")
-async def cleanup(ctx: Context):
-    if ctx.flags["force"]:
-        ...
+async def cleanup(ctx: Context, force: bool = flag("f", default=False, help="Force execution")):
+    if force:
+        log.warning("Force mode enabled")
+    ...
 ```
 
 **User experience:**
 
-- `myctl myplugin cleanup` → `force == False`
-- `myctl myplugin cleanup --force` → `force == True`
+- `{{metadata.pkgs.sdk}} myplugin cleanup` → `force = False`
+- `{{metadata.pkgs.sdk}} myplugin cleanup --force` → `force = True`
 
-**Key points:**
+#### 4. Flag with Choices
 
-- With `default=False`, the type is inferred as `bool`.
-- You check the flag as a normal boolean in your handler.
-
----
-
-### 4. Flag with a Restricted Set of Choices
-
-Use this when only a small number of values make sense (e.g. output formats, modes, levels).
+Restrict allowed inputs to a specific set of values.
 
 ```python
-@plugin.flag(
-    "format",
-    "f",
-    default="text",
-    help="Output format",
-    choices=["text", "json"],
-)
 @plugin.command("show", help="Show system info")
-async def show(ctx: Context):
-    format_ = ctx.flags["format"]
+async def show(
+    ctx: Context,
+    style: str = flag("s", default="text", choices=["text", "json"], help="Output format")
+):
     ...
 ```
 
-**User experience:**
-
-- `myctl myplugin show` → `format == "text"`
-- `myctl myplugin show --format json` → `format == "json"`
-- `myctl myplugin show --format xml` → validation error (`xml` not in `choices`)
-
-**Key points:**
-
-- `choices=[...]` restricts the set of valid values.
-- Validation happens **before** your handler runs.
-
 ---
 
-### 5. Controlling the Flag Type Explicitly
+### Smart Type Inference
 
-Most of the time, the type is inferred from `default`. If you need more control (or no default), you can use `flag_type`.
+Type inference priority:
+
+1. Parameter annotation (recommended)
+2. Default value type (when present and not Ellipsis)
+3. Fallback to `str`
+
+Example:
 
 ```python
-@plugin.flag("retries", "r", default=3, help="Retry count", flag_type=int)
-@plugin.command("sync", help="Sync with server")
-async def sync(ctx: Context):
-    retries = ctx.flags["retries"]  # int
-    ...
+# Best: explicit annotation
+count: int = flag("c", default=1, help="Retry count")
+
+# If annotation missing, inference falls back to default value
+limit = flag("l", default=10, help="Limit count")  # inferred as int
 ```
 
-You usually only need `flag_type` when:
-
-- You don't provide a default but still want a specific type.
-- You want to be explicit for readability.
-
 ---
 
-### 6. Multiple Flags at Once
-
-If a command has several flags, you can define them in a single block using `@plugin.flags([...])`.
+## Complete Example
 
 ```python
-@plugin.flags([
-    {
-        "name": "port",
-        "short": "p",
-        "default": 8080,
-        "help": "Port to bind",
-    },
-    {
-        "name": "force",
-        "short": "f",
-        "default": False,
-        "help": "Force restart",
-    },
-])
-@plugin.command("run", help="Run the server")
-async def run_server(ctx: Context):
-    port = ctx.flags["port"]
-    force = ctx.flags["force"]
-    ...
-```
-
-This is just a convenience wrapper around stacking multiple `@plugin.flag(...)` decorators; it behaves the same at runtime.
-
----
-
-### Summary
-
-- Use `default=...` to make a flag **optional** with a fallback.
-- Use `required=True` when the user **must** provide a value.
-- Use `choices=[...]` to limit the allowed values.
-- Use `flag_type=...` when you want to be explicit about the type.
-- Use `@plugin.flags([...])` to keep a bunch of related flags in one place.
-
-## Full Example
-
-```python
-from myctl.api import Plugin, Context, log
+from {{metadata.pkgs.sdk}} import Plugin, Context, flag, log
 
 plugin = Plugin()
 
-@plugin.flags([
-    {"name": "port", "short": "p", "default": 8080, "help": "Port to bind"},
-    {"name": "force", "short": "f", "default": False, "help": "Force restart"},
-])
-@plugin.command("run", help="Run the server")
-async def run_server(ctx: Context):
-    if ctx.flags.get("force"):
-        log.info("Force restart requested")
-    return ctx.ok(f"Server running on :{ctx.flags.get('port')}")
+@plugin.root
+async def main(
+    ctx: Context,
+    # Trigger flag, optional with default
+    verbose: bool = flag("v", default=False, help="Verbose output"),
+    # optional with default
+    count: int = flag("c", default=1, help="Retry count"),
+    # required (concise)
+    config: str = flag("C", help="Path to configuration file"),
+) -> Dict:
+    if verbose:
+        log.info("Starting operation", count=count)
+
+    # 'config' is guaranteed present (or the Engine returned an error earlier)
+    return ctx.ok({"executed": True, "count": count})
+
+@plugin.command("hi", help="Prints hi message")
+async def say_hi(
+  ctx: Context,
+  # required
+  name: str = flag("n", help="Users name"),
+) -> Dict:
+    ctx.ok()
 ```

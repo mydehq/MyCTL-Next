@@ -18,7 +18,7 @@ Useful for tasks like:
 - warming expensive resources before first command use
 
 ```python
-from myctl.api import Plugin, Context, log
+from {{metadata.pkgs.sdk}} import Plugin, Context, log
 
 plugin = Plugin()
 
@@ -43,7 +43,7 @@ Useful for tasks like:
 - emitting periodic health signals
 
 ```python
-from myctl.api import Plugin
+from {{metadata.pkgs.sdk}} import Plugin
 
 plugin = Plugin()
 
