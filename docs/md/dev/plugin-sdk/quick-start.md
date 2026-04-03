@@ -36,7 +36,7 @@ plugins/myplugin/
 
 ### TODO: initilize in plugin dir.
 
-Initialize your new plugin Dir with boilerplate files in plugin directory. It checks if the id is available & not in [system commands](/docs/md/dev/system-commands.md).
+Initialize your new plugin Dir with boilerplate files in plugin directory. It checks if the id is available & not in [system commands](/dev/system-commands.md).
 
 The generator prompts for:
 
